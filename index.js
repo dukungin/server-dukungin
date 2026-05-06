@@ -25,11 +25,13 @@ app.set('socketio', io);
 // Import Routes
 const overlayRoutes = require('./routers/overlayRouter');
 const xenditRoutes = require('./routers/xenditRouter'); // Buat file ini
+const midtransRoutes = require('./routers/midtransRouter'); // Buat file ini
 const authRoutes = require('./routers/authRouter'); // Buat file ini
 
 // Gunakan Routes
 app.use('/api/overlay', overlayRoutes);
 app.use('/api/xendit', xenditRoutes);
+app.use('/api/midtrans', midtransRoutes);
 app.use('/api/auth', authRoutes);
 
 // Sync Database & Jalankan Server
