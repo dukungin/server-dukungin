@@ -324,20 +324,6 @@ exports.register = async (req, res) => {
     });
     console.log('4. Overlay setting created');
 
-    // 5. Kirim Email (Titik krusial)
-    try {
-      await sendPinEmail(email, pin);
-      console.log('5. Email sent successfully');
-    } catch (mailError) {
-      // Jika email gagal, kita hapus user yang tanggung agar bisa daftar ulang
-      await User.findByIdAndDelete(newUser._id);
-      await OverlaySetting.deleteOne({ userId: newUser._id });
-      return res.status(500).json({ 
-        message: 'Gagal mengirim email verifikasi. Silakan coba lagi nanti.',
-        error: mailError.message 
-      });
-    }
-
     return res.status(201).json({ 
       message: 'Registrasi berhasil! PIN verifikasi telah dikirim ke email kamu.' 
     });
@@ -363,12 +349,6 @@ exports.login = async (req, res) => {
       return res.status(404).json({ message: 'User tidak ditemukan' });
     }
 
-    if (!user.isVerified) {
-      return res.status(403).json({
-        message: 'Akun belum diverifikasi. Cek email Anda.',
-      });
-    }
-
     const isPasswordValid = user.validPassword(password);
     if (!isPasswordValid) {
       return res.status(401).json({ message: 'Password salah' });
@@ -392,128 +372,5 @@ exports.login = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: 'Login Gagal', error: err.message });
-  }
-};
-
-// ============================================================
-// REQUEST RESET PASSWORD
-// ============================================================
-exports.requestResetPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: 'Email tidak ditemukan' });
-    }
-
-    const token = crypto.randomBytes(32).toString('hex');
-    user.resetToken = token;
-    user.resetTokenExpired = new Date(Date.now() + 15 * 60 * 1000);
-    await user.save();
-
-    const resetLink = `${process.env.FRONTEND_URL}/reset-password/${token}`;
-    await sendResetEmail(email, resetLink);
-
-    res.json({ message: 'Link reset password dikirim ke email' });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// ============================================================
-// RESET PASSWORD
-// ============================================================
-exports.resetPassword = async (req, res) => {
-  try {
-    const { token, newPassword } = req.body;
-
-    const user = await User.findOne({ resetToken: token });
-    if (!user) {
-      return res.status(400).json({ message: 'Token tidak valid' });
-    }
-
-    if (new Date() > user.resetTokenExpired) {
-      return res.status(400).json({ message: 'Token expired' });
-    }
-
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: 'Password minimal 6 karakter' });
-    }
-
-    // Set password baru — akan di-hash ulang oleh pre('save') hook
-    user.password = newPassword;
-    user.resetToken = undefined;
-    user.resetTokenExpired = undefined;
-    await user.save();
-
-    res.json({ message: 'Password berhasil direset' });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// ============================================================
-// VERIFY PIN
-// ============================================================
-exports.verifyPin = async (req, res) => {
-  try {
-    const { email, pin } = req.body;
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: 'User tidak ditemukan' });
-    }
-
-    const isMatch = await bcrypt.compare(pin, user.verifyPin);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'PIN salah' });
-    }
-
-    if (user.verifyPinExpired < new Date()) {
-      return res.status(400).json({ message: 'PIN expired' });
-    }
-
-    user.isVerified = true;
-    user.verifyPin = undefined;
-    user.verifyPinExpired = undefined;
-    await user.save();
-
-    res.json({ message: 'Verifikasi berhasil' });
-  } catch (err) {
-    res.status(500).json({ message: 'Gagal verifikasi' });
-  }
-};
-
-// ============================================================
-// RESEND PIN
-// ============================================================
-exports.resendPin = async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
-
-    // Anti spam: tunggu minimal 1 menit sejak PIN terakhir dikirim
-    if (
-      user.verifyPinExpired &&
-      user.verifyPinExpired > new Date(Date.now() - 4 * 60 * 1000)
-    ) {
-      return res.status(429).json({ message: 'Tunggu sebelum meminta PIN baru' });
-    }
-
-    const pin = Math.floor(100000 + Math.random() * 900000).toString();
-    const hashedPin = await bcrypt.hash(pin, 10);
-
-    user.verifyPin = hashedPin;
-    user.verifyPinExpired = new Date(Date.now() + 5 * 60 * 1000);
-    await user.save();
-
-    await sendPinEmail(email, pin);
-
-    res.json({ message: 'PIN dikirim ulang' });
-  } catch (err) {
-    res.status(500).json({ message: 'Gagal resend PIN' });
   }
 };
