@@ -1,17 +1,21 @@
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  host: 'smtp.gmail.com',
+  host: "smtp.gmail.com",
   port: 465,
   secure: true,
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS // Gunakan 16 digit App Password
+    pass: process.env.EMAIL_PASS,
   },
-  // Tambahkan timeout agar tidak stuck selamanya
+  // PAKSA MENGGUNAKAN IPV4
   connectionTimeout: 10000, 
-  greetingTimeout: 10000,
+  socketTimeout: 10000,
+  dnsTimeout: 10000,
+  // Opsi di bawah ini sangat krusial untuk error ENETUNREACH
+  options: {
+    family: 4 // Memaksa sistem mencari alamat IPv4 saja
+  }
 });
 
 exports.sendPinEmail = async (email, pin) => {
