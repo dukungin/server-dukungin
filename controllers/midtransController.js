@@ -224,6 +224,8 @@ exports.handleWebhook = async (req, res) => {
               donorName: dataDonasi.donorName,
               amount: dataDonasi.amount,
               message: dataDonasi.message,
+              mediaUrl: dataDonasi.mediaUrl || null,   // ← tambah
+              mediaType: dataDonasi.mediaType || 'image',
             };
 
             io.to(room).emit('new-donation', payload);
