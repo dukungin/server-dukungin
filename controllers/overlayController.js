@@ -64,9 +64,7 @@ exports.getSettings = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).lean();
     if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
-    console.log('USER:', req.user.id)
-    console.log('USER:', user.id)
-    const overlaySetting = await OverlaySetting.findOne({ userId: user.id }).lean();
+    const overlaySetting = await OverlaySetting.findOne({ userId: user._id }).lean();
 
     res.json({
       user,
