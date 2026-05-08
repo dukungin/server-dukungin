@@ -55,6 +55,7 @@
 
 // controllers/overlayController.js
 const { OverlaySetting, User } = require('../models');
+require('dotenv').config();
 
 // ============================================================
 // GET SETTINGS (user yang sedang login)

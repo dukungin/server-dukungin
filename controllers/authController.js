@@ -253,6 +253,7 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
 const { sendPinEmail } = require('../utils/sendPinEmail');
+require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -355,7 +356,7 @@ exports.login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user._id, username: user.username },  // ← _id
+      { id: user._id, username: user.username, email: user.email, walletBalance: user.walletBalance, overlayToken: user.overlayToken },  // ← _id
       JWT_SECRET,
       { expiresIn: '1d' }
     );
