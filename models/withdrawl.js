@@ -1,58 +1,51 @@
 // module.exports = (sequelize, DataTypes) => {
-//   return sequelize.define('Withdrawal', {
+//   return sequelize.define('Donation', {
+//     externalId: { type: DataTypes.STRING, unique: true }, // order_id yang dikirim ke Midtrans
 //     userId: {
 //       type: DataTypes.INTEGER,
 //       allowNull: false,
 //     },
-//     amount: {
-//       type: DataTypes.DECIMAL(15, 2),
-//       allowNull: false,
-//     },
-//     // 'BANK', 'DANA', 'GOPAY'
-//     paymentMethod: {
-//       type: DataTypes.STRING,
-//       allowNull: false,
-//     },
-//     // Kode Bank (BCA/BNI/MANDIRI) atau E-Wallet (DANA/OVO/GOPAY)
-//     channelCode: {
-//       type: DataTypes.STRING,
-//       allowNull: false,
-//     },
-//     accountNumber: {
-//       type: DataTypes.STRING,
-//       allowNull: false,
-//     },
-//     accountName: {
-//       type: DataTypes.STRING,
-//       allowNull: false,
-//     },
+//     donorName: { type: DataTypes.STRING, defaultValue: 'Anonim' },
+//     amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+//     message: { type: DataTypes.TEXT },
 //     status: {
-//       type: DataTypes.ENUM('PENDING', 'COMPLETED', 'FAILED'),
+//       type: DataTypes.ENUM('PENDING', 'PAID', 'EXPIRED'),
 //       defaultValue: 'PENDING',
 //     },
-//     // Ini adalah externalId yang kita kirim ke Xendit (format: wd-userId-timestamp)
-//     // Xendit akan kirim balik nilai ini di webhook sebagai `external_id`
-//     xenditReference: {
-//       type: DataTypes.STRING,
-//       unique: true, // Harus unik untuk idempotency
-//     },
+//     paymentUrl: { type: DataTypes.STRING }, // Snap redirect_url
 //   });
 // };
 
-module.exports = (sequelize, DataTypes) => {
-  return sequelize.define('Donation', {
-    externalId: { type: DataTypes.STRING, unique: true }, // order_id yang dikirim ke Midtrans
+
+// models/withdrawal.js
+const mongoose = require('mongoose');
+
+const withdrawalSchema = new mongoose.Schema(
+  {
     userId: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
     },
-    donorName: { type: DataTypes.STRING, defaultValue: 'Anonim' },
-    amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
-    message: { type: DataTypes.TEXT },
+    amount: {
+      type: Number,
+      required: true,
+    },
+    paymentMethod: String,
+    channelCode: String,
+    accountNumber: String,
+    accountName: String,
     status: {
-      type: DataTypes.ENUM('PENDING', 'PAID', 'EXPIRED'),
-      defaultValue: 'PENDING',
+      type: String,
+      enum: ['PENDING', 'COMPLETED', 'FAILED'],
+      default: 'PENDING',
     },
-    paymentUrl: { type: DataTypes.STRING }, // Snap redirect_url
-  });
-};
+    midtransReference: String,
+  },
+  { timestamps: true }
+);
+
+withdrawalSchema.index({ userId: 1, createdAt: -1 });
+withdrawalSchema.index({ status: 1 });
+
+module.exports = mongoose.model('Withdrawal', withdrawalSchema);
