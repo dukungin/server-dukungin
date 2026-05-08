@@ -44,45 +44,23 @@
 
 
 // models/overlaySetting.js
-const mongoose = require('mongoose');
-
 const overlaySettingSchema = new mongoose.Schema(
   {
-    // Relasi ke User — pakai ObjectId, bukan integer
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      unique: true, // 1 user, 1 overlay setting
+      unique: true,
     },
-    minDonate: {
-      type: Number,
-      default: 10000,
-    },
-    maxDonate: {
-      type: Number,
-      default: 10000000,
-    },
-    overlayTheme: {
-      type: String,
-      default: 'modern',
-    },
-    backgroundColor: {
-      type: String,
-      default: '#ffffff',
-    },
-    textColor: {
-      type: String,
-      default: '#000000',
-    },
-    animationType: {
-      type: String,
-      default: 'fade',
-    },
-    duration: {
-      type: Number,
-      default: 5000,
-    },
+    minDonate: { type: Number, default: 10000 },
+    maxDonate: { type: Number, default: 10000000 },
+    theme: { type: String, default: 'modern' },           // ← ganti overlayTheme
+    primaryColor: { type: String, default: '#6366f1' },   // ← ganti backgroundColor
+    textColor: { type: String, default: '#ffffff' },
+    animation: { type: String, default: 'bounce' },       // ← ganti animationType
+    baseDuration: { type: Number, default: 5 },           // ← ganti duration
+    extraPerAmount: { type: Number, default: 10000 },     // ← tambah
+    extraDuration: { type: Number, default: 1 },          // ← tambah
     soundUrl: String,
     customCss: String,
   },

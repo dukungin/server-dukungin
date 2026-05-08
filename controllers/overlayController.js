@@ -62,9 +62,17 @@ require('dotenv').config();
 // ============================================================
 exports.getSettings = async (req, res) => {
   try {
-    // userId sekarang adalah ObjectId dari JWT payload
-    const settings = await OverlaySetting.findOne({ userId: req.user.id });
-    res.json(settings);
+    const user = await User.findById(req.user.id).lean();
+    if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
+    console.log('USER:', req.user.id)
+    console.log('USER:', user.id)
+    const overlaySetting = await OverlaySetting.findOne({ userId: user.id }).lean();
+
+    res.json({
+      user,
+      overlaySetting,
+      settings: overlaySetting
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server Error', error: err.message });
   }
