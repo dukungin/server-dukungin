@@ -224,7 +224,7 @@ exports.handleWebhook = async (req, res) => {
               donorName: dataDonasi.donorName,
               amount: dataDonasi.amount,
               message: dataDonasi.message,
-              mediaUrl: dataDonasi.mediaUrl || null,   // ← tambah
+              mediaUrl: dataDonasi.mediaUrl || null,   // ← dari donor
               mediaType: dataDonasi.mediaType || 'image',
             };
 
