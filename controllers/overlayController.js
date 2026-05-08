@@ -62,12 +62,17 @@ require('dotenv').config();
 // ============================================================
 exports.getSettings = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).lean();
+    const user = await User.findById(req.user.id)
+      .select('-password')  // ← jangan kirim password!
+      .lean();
+      
     if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
+
     const overlaySetting = await OverlaySetting.findOne({ userId: user._id }).lean();
 
     res.json({
       user,
+      User: user,
       overlaySetting,
       settings: overlaySetting
     });

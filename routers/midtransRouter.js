@@ -1,42 +1,9 @@
-// const express = require('express');
-// const router = express.Router();
-// const midtransCtrl = require('../controllers/midtransController');
-// const authMiddleware = require('../middleware/authMiddleware');
-
-// // ============================================================
-// // PUBLIC — Donasi dari viewer
-// // ============================================================
-// router.post('/create-invoice', midtransCtrl.createDonation);
-
-// // ============================================================
-// // WEBHOOK MIDTRANS SNAP
-// // Daftarkan URL ini di: Midtrans Dashboard → Settings → Configuration
-// //   → Payment Notification URL → https://yourdomain.com/api/midtrans/webhooks
-// // ============================================================
-// router.post('/webhooks', midtransCtrl.handleWebhook);
-
-// // ============================================================
-// // PROTECTED — Streamer yang sudah login
-// // ============================================================
-// router.post('/withdraw', authMiddleware, midtransCtrl.requestWithdrawal);
-// router.get('/withdraw/history', authMiddleware, midtransCtrl.getWithdrawalHistory);
-
-// // ============================================================
-// // ADMIN — Kelola request withdrawal manual
-// // GET  /api/midtrans/admin/withdrawals          → list semua PENDING
-// // PUT  /api/midtrans/admin/withdrawals/:id      → update status (COMPLETED/FAILED)
-// // ============================================================
-// router.get('/admin/withdrawals', authMiddleware, midtransCtrl.adminGetPendingWithdrawals);
-// router.put('/admin/withdrawals/:id', authMiddleware, midtransCtrl.adminUpdateWithdrawal);
-
-// module.exports = router;
-
-
 // routers/midtransRouter.js — tidak ada perubahan dari versi MySQL
 const express = require('express');
 const router = express.Router();
 const midtransCtrl = require('../controllers/midtransController');
 const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
 
 router.post('/create-invoice', midtransCtrl.createDonation);
 router.post('/webhooks',       midtransCtrl.handleWebhook);
@@ -44,7 +11,20 @@ router.post('/webhooks',       midtransCtrl.handleWebhook);
 router.post('/withdraw',         authMiddleware, midtransCtrl.requestWithdrawal);
 router.get('/withdraw/history',  authMiddleware, midtransCtrl.getWithdrawalHistory);
 
-router.get('/admin/withdrawals',      authMiddleware, midtransCtrl.adminGetPendingWithdrawals);
-router.put('/admin/withdrawals/:id',  authMiddleware, midtransCtrl.adminUpdateWithdrawal);
+router.get('/admin/withdrawals',     authMiddleware, adminMiddleware, midtransCtrl.adminGetPendingWithdrawals);
+router.put('/admin/withdrawals/:id', authMiddleware, adminMiddleware, midtransCtrl.adminUpdateWithdrawal);
+
+router.post('/test-socket', authMiddleware, async (req, res) => {
+  const io = req.app.get('socketio');
+  const user = await require('../models').User.findById(req.user.id);
+  
+  io.to(user.overlayToken).emit('new-donation', {
+    donorName: req.body.donorName || 'Test Donor',
+    amount: req.body.amount || 50000,
+    message: req.body.message || 'Test donasi dari dashboard!'
+  });
+  
+  res.json({ message: 'Socket test sent!', room: user.overlayToken });
+});
 
 module.exports = router;
