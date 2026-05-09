@@ -281,7 +281,7 @@ exports.requestWithdrawal = async (req, res) => {
     return res.status(400).json({ message: 'Data rekening/e-wallet tidak lengkap' });
   }
 
-  const FEE = 5000;
+  const FEE = 500;
   const totalDeduct = parseFloat(amount) + FEE;
 
   // Gunakan MongoDB session untuk atomic transaction
