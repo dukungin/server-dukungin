@@ -2,7 +2,8 @@
 const midtransClient = require('midtrans-client');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
-const { Donation, Withdrawal, User } = require('../models');
+const { Donation, Withdrawal, User, OverlaySetting } = require('../models');
+const { containsBannedWord } = require('./bannedWordController');
 require('dotenv').config();
 console.log('MONGO_URI:', process.env.MONGO_URI);
 console.log('SERVER_KEY:', process.env.MIDTRANS_SERVER_KEY);
@@ -89,6 +90,11 @@ exports.createDonation = async (req, res) => {
     };
 
     const snapResponse = await snap.createTransaction(parameter);
+
+    const isBanned = await containsBannedWord(userId, message);
+    if (isBanned) {
+      return res.status(400).json({ message: 'Pesanmu mengandung kata yang tidak diizinkan oleh streamer ini.' });
+    }
 
     await Donation.create({
       externalId: orderId,
@@ -220,6 +226,11 @@ exports.handleWebhook = async (req, res) => {
               console.warn(`[Webhook] ⚠️ Tidak ada client yang terkoneksi di room "${room}"`);
             }
 
+            const overlaySetting = await OverlaySetting.findOne({ userId: streamer._id });
+            const soundUrl = overlaySetting?.getSoundForAmount
+              ? overlaySetting.getSoundForAmount(dataDonasi.amount)
+              : (overlaySetting?.soundUrl || null);
+
             const payload = {
               donorName: dataDonasi.donorName,
               amount: dataDonasi.amount,
@@ -227,6 +238,7 @@ exports.handleWebhook = async (req, res) => {
               mediaUrl: dataDonasi.mediaUrl || null,   // ← dari donor
               mediaType: dataDonasi.mediaType || 'image',
               receivedAt: new Date().toISOString(),
+              soundUrl
             };
 
             io.to(room).emit('new-donation', payload);

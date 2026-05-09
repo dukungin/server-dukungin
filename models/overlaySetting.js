@@ -24,6 +24,14 @@ const mediaTriggerSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const soundTierSchema = new mongoose.Schema({
+  minAmount: { type: Number, required: true },
+  maxAmount: { type: Number, default: null },
+  soundUrl:  { type: String, required: true },
+  label:     { type: String, default: '' },
+}, { _id: false });
+
+
 // ─── Main Schema ──────────────────────────────────────────────────────────────
 
 const overlaySettingSchema = new mongoose.Schema(
@@ -70,6 +78,7 @@ const overlaySettingSchema = new mongoose.Schema(
 
     // ── Media Triggers ───────────────────────────────────────────────────────
     mediaTriggers: { type: [mediaTriggerSchema], default: [] },
+    soundTiers: { type: [soundTierSchema], default: [] },
 
     // ── Misc ────────────────────────────────────────────────────────────────
     soundUrl:  String,
@@ -102,6 +111,17 @@ overlaySettingSchema.methods.getMediaTriggerForAmount = function (amount) {
     .filter((t) => amount >= t.minAmount)
     .sort((a, b) => b.minAmount - a.minAmount);
   return eligible[0] || null;
+};
+
+overlaySettingSchema.methods.getSoundForAmount = function (amount) {
+  if (!this.soundTiers || this.soundTiers.length === 0) return this.soundUrl || null;
+  const sorted = [...this.soundTiers].sort((a, b) => b.minAmount - a.minAmount);
+  for (const tier of sorted) {
+    if (amount >= tier.minAmount && (tier.maxAmount === null || amount <= tier.maxAmount)) {
+      return tier.soundUrl;
+    }
+  }
+  return this.soundUrl || null;
 };
 
 module.exports = mongoose.model('OverlaySetting', overlaySettingSchema);
