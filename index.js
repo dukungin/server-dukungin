@@ -67,6 +67,7 @@ app.set('socketio', io);
 const overlayRoutes  = require('./routers/overlayRouter');
 const midtransRoutes = require('./routers/midtransRouter');
 const authRoutes     = require('./routers/authRouter');
+const donationRoutes     = require('./routers/donationRouter');
 
 // ✅ Testing route
 app.get('/testing', (req, res) => {
@@ -81,6 +82,7 @@ app.get('/testing', (req, res) => {
 app.use('/api/overlay',   overlayRoutes);
 app.use('/api/midtrans',  midtransRoutes);
 app.use('/api/auth',      authRoutes);
+app.use('/api/donations',      donationRoutes);
 
 // Koneksi ke MongoDB lalu jalankan server
 const PORT = process.env.PORT || 5101;
