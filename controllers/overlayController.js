@@ -52,6 +52,14 @@ exports.updateSettings = async (req, res) => {
       { new: true, upsert: true, runValidators: false }
     );
 
+    try {
+      const io = req.app.get('socketio');
+      const user = await User.findById(req.user.id).lean();
+      if (io && user?.overlayToken) {
+        io.to(user.overlayToken).emit('settings-updated', setting);
+      }
+    } catch (e) {}
+
     res.json({ message: 'Settings updated successfully', data: setting });
   } catch (err) {
     console.error('[updateSettings] Error:', err);
