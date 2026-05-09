@@ -21,7 +21,9 @@ router.post('/test-socket', authMiddleware, async (req, res) => {
   io.to(user.overlayToken).emit('new-donation', {
     donorName: req.body.donorName || 'Test Donor',
     amount: req.body.amount || 50000,
-    message: req.body.message || 'Test donasi dari dashboard!'
+    message: req.body.message || 'Test donasi!',
+    mediaUrl: req.body.mediaUrl || null,
+    mediaType: req.body.mediaType || 'image',
   });
   
   res.json({ message: 'Socket test sent!', room: user.overlayToken });
