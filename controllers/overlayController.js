@@ -31,13 +31,30 @@ exports.getSettings = async (req, res) => {
 // ============================================================
 exports.updateSettings = async (req, res) => {
   try {
+    const allowedFields = [
+      'minDonate', 'maxDonate', 'theme', 'primaryColor', 'textColor',
+      'animation', 'maxWidth', 'overlayPosition', 'baseDuration',
+      'extraPerAmount', 'extraDuration', 'durationTiers', 'mediaTriggers',
+      'soundUrl', 'customCss',
+    ];
+
+    console.log('[updateSettings] body:', JSON.stringify(req.body, null, 2));
+
+    // Pakai $set eksplisit — jangan spread langsung ke root
+    const updateData = {};
+    allowedFields.forEach(key => {
+      if (req.body[key] !== undefined) updateData[key] = req.body[key];
+    });
+
     const setting = await OverlaySetting.findOneAndUpdate(
       { userId: req.user.id },
-      { ...req.body, userId: req.user.id },
-      { new: true, upsert: true, runValidators: true }
+      { $set: updateData },           // ← pakai $set, bukan spread
+      { new: true, upsert: true, runValidators: false }
     );
+
     res.json({ message: 'Settings updated successfully', data: setting });
   } catch (err) {
+    console.error('[updateSettings] Error:', err);
     res.status(400).json({ message: 'Update failed', error: err.message });
   }
 };
