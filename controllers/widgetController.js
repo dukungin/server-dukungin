@@ -34,62 +34,87 @@ exports.qrcode = async (req, res) => {
 // LAKUKAN HAL YANG SAMA UNTUK milestones DAN leaderboard
 exports.milestones = async (req, res) => {
   try {
-    const { token } = req.params; // Gunakan token
+    const { token } = req.params;
     const user = await getUserByToken(token) || await User.findOne({ username: token }).lean();
     if (!user) return res.status(404).send('Not found');
 
+    // 1. Ambil Milestones (Gunakan user._id asli)
     const milestones = await Milestone.find({ userId: user._id }).sort('order').lean();
+
+    // 2. Agregasi Total Donasi (PAID)
     const agg = await Donation.aggregate([
-      { $match: { userId: user._id, status: 'PAID' } },
+      { 
+        $match: { 
+          userId: new mongoose.Types.ObjectId(user._id), // Pastikan ini ObjectId!
+          status: 'PAID' 
+        } 
+      },
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
+
     const totalPaid = agg[0]?.total || 0;
 
-    const enriched = milestones.map(m => ({
-      ...m,
-      currentAmount: Math.min(totalPaid, m.targetAmount),
-      progress: Math.min(100, Math.round((totalPaid / m.targetAmount) * 100)),
-      reached: totalPaid >= m.targetAmount,
-    }));
+    // 3. Mapping data untuk cegah NaN
+    const enriched = milestones.map(m => {
+      const target = Number(m.targetAmount) || 0;
+      const current = Math.min(totalPaid, target);
+      const progress = target > 0 ? Math.min(100, Math.round((totalPaid / target) * 100)) : 0;
+
+      return {
+        ...m,
+        targetAmount: target,
+        currentAmount: current,
+        progress: progress,
+        reached: totalPaid >= target,
+      };
+    });
+    console.log("DEBUG DATA:", { totalPaid, milestoneCount: milestones.length, donorCount: donors.length });
 
     res.send(renderMilestonesHTML(enriched, user.username, totalPaid));
-  } catch (error) {
-    res.status(500).send('Error');
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error");
   }
 };
 
+// ─── LEADERBOARD WIDGET ───────────────────────────────────────────────────────
 exports.leaderboard = async (req, res) => {
   try {
-    const { token } = req.params; // Gunakan token
+    const { token } = req.params;
     const user = await getUserByToken(token) || await User.findOne({ username: token }).lean();
     if (!user) return res.status(404).send('Not found');
 
     const setting = await OverlaySetting.findOne({ userId: user._id }).lean();
     const limit = setting?.leaderboardLimit || 10;
     const showAmount = setting?.leaderboardShowAmount !== false;
-    const period = setting?.leaderboardPeriod || 'alltime';
 
-    const matchExtra = {};
-    if (period === 'today') {
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      matchExtra.createdAt = { $gte: startOfDay };
-    }
-
+    // Agregasi Leaderboard
     const donors = await Donation.aggregate([
-      { $match: { userId: user._id, status: 'PAID', ...matchExtra } },
-      { $group: { _id: '$donorName', totalAmount: { $sum: '$amount' }, count: { $sum: 1 } } },
+      { 
+        $match: { 
+          userId: new mongoose.Types.ObjectId(user._id), // KONVERSI KE OBJECTID
+          status: 'PAID' 
+        } 
+      },
+      { 
+        $group: { 
+          _id: { $toLower: '$donorName' }, // Group by nama (case-insensitive)
+          realName: { $first: '$donorName' },
+          totalAmount: { $sum: '$amount' }, 
+          count: { $sum: 1 } 
+        } 
+      },
       { $sort: { totalAmount: -1 } },
       { $limit: limit },
-      { $project: { name: '$_id', totalAmount: 1, count: 1, _id: 0 } },
+      { $project: { name: '$realName', totalAmount: 1, count: 1, _id: 0 } },
     ]);
 
     res.send(renderLeaderboardHTML(donors, user.username, showAmount));
-  } catch (error) {
-    res.status(500).send('Error');
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error");
   }
 };
-
 // ─── HTML RENDERERS ───────────────────────────────────────────────────────────
 
 const renderMilestonesHTML = (milestones, username, totalPaid) => `<!DOCTYPE html>
