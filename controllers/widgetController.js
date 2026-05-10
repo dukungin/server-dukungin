@@ -69,7 +69,7 @@ exports.milestones = async (req, res) => {
         reached: totalPaid >= target,
       };
     });
-    console.log("DEBUG DATA:", { totalPaid, milestoneCount: milestones.length, donorCount: donors.length });
+    console.log("DEBUG DATA:", { totalPaid, milestoneCount: milestones.length });
 
     res.send(renderMilestonesHTML(enriched, user.username, totalPaid));
   } catch (err) {
@@ -192,7 +192,7 @@ const renderMilestonesHTML = (milestones, username, totalPaid) => `<!DOCTYPE htm
 </body>
 </html>`;
 
-const renderLeaderboardHTML = (donors, username) => `<!DOCTYPE html>
+const renderLeaderboardHTML = (donors, username, showAmount) => `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
