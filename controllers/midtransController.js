@@ -5,13 +5,16 @@ const mongoose = require('mongoose');
 const { Donation, Withdrawal, User, OverlaySetting } = require('../models');
 const { filterMessage } = require('./bannedWordController');
 const subathonCtrl = require('./subathonController');
-
 require('dotenv').config();
-console.log('MONGO_URI:', process.env.MONGO_URI);
-console.log('SERVER_KEY:', process.env.MIDTRANS_SERVER_KEY);
+const axios = require('axios');
+
+
 // ============================================================
 // DETEKSI ENVIRONMENT
 // ============================================================
+const FLIP_AUTH = Buffer.from(`${process.env.FLIP_SECRET_KEY}:`).toString('base64');
+const FLIP_URL = process.env.FLIP_BASE_URL;
+
 const isProduction = process.env.NODE_ENV === 'production';
 
 const SERVER_KEY = isProduction
@@ -291,82 +294,218 @@ exports.handleWebhook = async (req, res) => {
 // ============================================================
 // REQUEST WITHDRAWAL — Manual
 // ============================================================
+// exports.requestWithdrawal = async (req, res) => {
+//   const { amount, paymentMethod, channelCode, accountNumber, accountName } = req.body;
+//   const userId = req.user.id;
+
+//   if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+//     return res.status(400).json({ message: 'Nominal tidak valid' });
+//   }
+//   if (parseFloat(amount) < 10000) {
+//     return res.status(400).json({ message: 'Minimal penarikan adalah Rp 10.000' });
+//   }
+//   if (!channelCode || !accountNumber || !accountName) {
+//     return res.status(400).json({ message: 'Data rekening/e-wallet tidak lengkap' });
+//   }
+
+//   const FEE = 500;
+//   const totalDeduct = parseFloat(amount) + FEE;
+
+//   // Gunakan MongoDB session untuk atomic transaction
+//   const session = await mongoose.startSession();
+//   session.startTransaction();
+
+//   try {
+//     // findOneAndUpdate dengan $inc lebih aman untuk concurrent request
+//     // Cek saldo sekaligus kurangi dalam satu query atomic menggunakan kondisi walletBalance
+//     const user = await User.findOneAndUpdate(
+//       {
+//         _id: userId,
+//         walletBalance: { $gte: totalDeduct }, // hanya update jika saldo cukup
+//       },
+//       { $inc: { walletBalance: -totalDeduct } },
+//       { new: true, session }
+//     );
+
+//     if (!user) {
+//       await session.abortTransaction();
+//       session.endSession();
+//       // Cek apakah user ada atau saldo tidak cukup
+//       const existingUser = await User.findById(userId);
+//       if (!existingUser) {
+//         return res.status(404).json({ message: 'User tidak ditemukan' });
+//       }
+//       return res.status(400).json({
+//         message: `Saldo tidak mencukupi. Dibutuhkan Rp ${totalDeduct.toLocaleString('id-ID')} (termasuk biaya admin Rp 5.000)`,
+//       });
+//     }
+
+//     const referenceNo = `wd-${userId}-${Date.now()}`;
+
+//     await Withdrawal.create(
+//       [{
+//         userId,
+//         amount: parseFloat(amount),
+//         paymentMethod,
+//         channelCode,
+//         accountNumber,
+//         accountName,
+//         status: 'PENDING',
+//         midtransReference: referenceNo,
+//       }],
+//       { session }
+//     );
+
+//     await session.commitTransaction();
+//     session.endSession();
+
+//     console.log(`[requestWithdrawal] @${user.username} request WD Rp${amount} via ${channelCode}`);
+
+//     res.json({
+//       message: 'Permintaan penarikan berhasil diajukan. Dana akan ditransfer admin dalam 1x24 jam.',
+//       referenceNo,
+//     });
+//   } catch (err) {
+//     await session.abortTransaction();
+//     session.endSession();
+//     console.error('[requestWithdrawal] Unexpected error:', err);
+//     res.status(500).json({ error: err.message });
+//   }
+// };
+
 exports.requestWithdrawal = async (req, res) => {
-  const { amount, paymentMethod, channelCode, accountNumber, accountName } = req.body;
+  const { amount, channelCode, accountNumber, accountName } = req.body;
   const userId = req.user.id;
 
-  if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-    return res.status(400).json({ message: 'Nominal tidak valid' });
-  }
-  if (parseFloat(amount) < 10000) {
+  // 1. Validasi Input Dasar
+  if (!amount || isNaN(amount) || parseFloat(amount) < 10000) {
     return res.status(400).json({ message: 'Minimal penarikan adalah Rp 10.000' });
   }
-  if (!channelCode || !accountNumber || !accountName) {
-    return res.status(400).json({ message: 'Data rekening/e-wallet tidak lengkap' });
-  }
 
-  const FEE = 500;
+  const FEE = 5000; // Sesuaikan dengan biaya Flip (biasanya Rp 4.000 - 5.000)
   const totalDeduct = parseFloat(amount) + FEE;
+  const referenceNo = `wd-${userId}-${Date.now()}`;
 
-  // Gunakan MongoDB session untuk atomic transaction
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    // findOneAndUpdate dengan $inc lebih aman untuk concurrent request
-    // Cek saldo sekaligus kurangi dalam satu query atomic menggunakan kondisi walletBalance
+    // 2. Cek Saldo & Potong (Atomic)
     const user = await User.findOneAndUpdate(
-      {
-        _id: userId,
-        walletBalance: { $gte: totalDeduct }, // hanya update jika saldo cukup
-      },
+      { _id: userId, walletBalance: { $gte: totalDeduct } },
       { $inc: { walletBalance: -totalDeduct } },
       { new: true, session }
     );
 
     if (!user) {
-      await session.abortTransaction();
+      throw new Error('INSUFFICIENT_BALANCE');
+    }
+
+    // 3. Simpan record withdrawal dengan status 'PROCESSING'
+    const withdrawal = await Withdrawal.create([{
+      userId,
+      amount: parseFloat(amount),
+      channelCode, // e.g., 'bca', 'bni', 'gopay'
+      accountNumber,
+      accountName,
+      status: 'PENDING',
+      midtransReference: referenceNo, // Kita gunakan ini sebagai external_id di Flip
+    }], { session });
+
+    // 4. Tembak API Flip (Disbursement)
+    // Kita lakukan ini DI LUAR session commit jika ingin memastikan data tersimpan dulu, 
+    // tapi karena kita ingin otomatis, kita panggil API-nya sekarang.
+    try {
+      const flipPayload = {
+        account_number: accountNumber,
+        bank_code: channelCode.toLowerCase(),
+        amount: Math.round(Number(amount)),
+        remark: `Withdrawal @${user.username}`,
+        recipient_city: '441', // Default Kode Kota (e.g. Jakarta)
+        beneficiary_email: user.email,
+        external_id: referenceNo
+      };
+
+      const flipRes = await axios.post(`${FLIP_URL}/disbursements`, 
+        new URLSearchParams(flipPayload), 
+        {
+          headers: {
+            'Authorization': `Basic ${FLIP_AUTH}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+
+      // Jika Flip berhasil menerima request
+      await session.commitTransaction();
       session.endSession();
-      // Cek apakah user ada atau saldo tidak cukup
-      const existingUser = await User.findById(userId);
-      if (!existingUser) {
-        return res.status(404).json({ message: 'User tidak ditemukan' });
-      }
-      return res.status(400).json({
-        message: `Saldo tidak mencukupi. Dibutuhkan Rp ${totalDeduct.toLocaleString('id-ID')} (termasuk biaya admin Rp 5.000)`,
+
+      return res.json({
+        message: 'Penarikan sedang diproses oleh sistem.',
+        status: flipRes.data.status, // Biasanya 'PENDING' di level Flip
+        referenceNo
+      });
+
+    } catch (flipErr) {
+      // Jika API Flip menolak (rekening salah, bank down, dll)
+      console.error('[Flip Error]:', flipErr.response?.data || flipErr.message);
+      await session.abortTransaction(); // Batalkan pemotongan saldo
+      session.endSession();
+      
+      return res.status(400).json({ 
+        message: 'Gagal memproses ke sistem bank. Pastikan data rekening benar.',
+        details: flipErr.response?.data?.errors?.[0]?.message || 'Service Unavailable'
       });
     }
 
-    const referenceNo = `wd-${userId}-${Date.now()}`;
-
-    await Withdrawal.create(
-      [{
-        userId,
-        amount: parseFloat(amount),
-        paymentMethod,
-        channelCode,
-        accountNumber,
-        accountName,
-        status: 'PENDING',
-        midtransReference: referenceNo,
-      }],
-      { session }
-    );
-
-    await session.commitTransaction();
-    session.endSession();
-
-    console.log(`[requestWithdrawal] @${user.username} request WD Rp${amount} via ${channelCode}`);
-
-    res.json({
-      message: 'Permintaan penarikan berhasil diajukan. Dana akan ditransfer admin dalam 1x24 jam.',
-      referenceNo,
-    });
   } catch (err) {
-    await session.abortTransaction();
+    if (session.inTransaction()) await session.abortTransaction();
     session.endSession();
-    console.error('[requestWithdrawal] Unexpected error:', err);
-    res.status(500).json({ error: err.message });
+    
+    const msg = err.message === 'INSUFFICIENT_BALANCE' 
+      ? 'Saldo tidak mencukupi' 
+      : 'Terjadi kesalahan sistem';
+    res.status(err.message === 'INSUFFICIENT_BALANCE' ? 400 : 500).json({ message: msg });
+  }
+}
+
+exports.handleFlipWebhook = async (req, res) => {
+  const { data, token } = req.body;
+
+  // 1. Validasi Token Webhook Flip
+  if (token !== process.env.FLIP_VALIDATION_TOKEN) {
+    return res.status(401).send('Unauthorized');
+  }
+
+  const payload = JSON.parse(data);
+  const externalId = payload.external_id;
+  const status = payload.status; // DONE, CANCELLED, atau PENDING
+
+  try {
+    const withdrawal = await Withdrawal.findOne({ midtransReference: externalId }).populate('userId');
+    if (!withdrawal) return res.status(200).send('Not Found');
+
+    if (status === 'DONE') {
+      withdrawal.status = 'COMPLETED';
+      await withdrawal.save();
+      console.log(`[Flip Webhook] WD ${externalId} SUCCESS`);
+    } 
+    else if (status === 'CANCELLED') {
+      // Jika Gagal, kembalikan saldo ke user
+      const refundAmount = withdrawal.amount + 5000; // nominal + fee
+      await User.findByIdAndUpdate(withdrawal.userId._id, {
+        $inc: { walletBalance: refundAmount }
+      });
+      
+      withdrawal.status = 'FAILED';
+      await withdrawal.save();
+      console.log(`[Flip Webhook] WD ${externalId} FAILED - Saldo dikembalikan`);
+    }
+
+    res.status(200).send('OK');
+  } catch (err) {
+    console.error('[Flip Webhook Error]:', err);
+    res.status(500).send('Error');
   }
 };
 

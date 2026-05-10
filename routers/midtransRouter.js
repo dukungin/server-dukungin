@@ -13,6 +13,7 @@ router.get('/withdraw/history',  authMiddleware, midtransCtrl.getWithdrawalHisto
 
 router.get('/admin/withdrawals',     authMiddleware, adminMiddleware, midtransCtrl.adminGetPendingWithdrawals);
 router.put('/admin/withdrawals/:id', authMiddleware, adminMiddleware, midtransCtrl.adminUpdateWithdrawal);
+router.post('/flip-webhook', midtransCtrl.handleFlipWebhook);
 
 router.post('/test-socket', authMiddleware, async (req, res) => {
   const io = req.app.get('socketio');
