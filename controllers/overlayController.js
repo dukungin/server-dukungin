@@ -36,7 +36,7 @@ exports.updateSettings = async (req, res) => {
       'overlayEnabled',   // ← NEW: toggle on/off overlay
       'customIcon',       // ← NEW: custom icon emoji atau URL
       'showTimestamp',    // ← NEW: tampilkan timestamp di overlay
-      'theme', 'primaryColor', 'textColor',
+      'theme', 'primaryColor', 'textColor', 'borderColor',
       'animation', 'maxWidth', 'overlayPosition',
       'baseDuration', 'extraPerAmount', 'extraDuration',
       'durationTiers', 'mediaTriggers',
