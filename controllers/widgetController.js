@@ -69,8 +69,12 @@ exports.milestones = async (req, res) => {
         reached: totalPaid >= target,
       };
     });
-    console.log("DEBUG DATA:", { totalPaid, milestoneCount: milestones.length });
+    
+    if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      return res.json(enriched); // Mengirim array milestone yang sudah di-mapping
+    }
 
+    // Jika dibuka langsung di OBS sebagai Browser Source (HTML)
     res.send(renderMilestonesHTML(enriched, user.username, totalPaid));
   } catch (err) {
     console.error(err);
@@ -86,36 +90,71 @@ exports.leaderboard = async (req, res) => {
     if (!user) return res.status(404).send('Not found');
 
     const setting = await OverlaySetting.findOne({ userId: user._id }).lean();
-    const limit = setting?.leaderboardLimit || 10;
-    const showAmount = setting?.leaderboardShowAmount !== false;
-
-    // Agregasi Leaderboard
+    
     const donors = await Donation.aggregate([
-      { 
-        $match: { 
-          userId: new mongoose.Types.ObjectId(user._id), // KONVERSI KE OBJECTID
-          status: 'PAID' 
-        } 
-      },
+      { $match: { userId: new mongoose.Types.ObjectId(user._id), status: 'PAID' } },
       { 
         $group: { 
-          _id: { $toLower: '$donorName' }, // Group by nama (case-insensitive)
+          _id: { $toLower: '$donorName' }, 
           realName: { $first: '$donorName' },
           totalAmount: { $sum: '$amount' }, 
           count: { $sum: 1 } 
         } 
       },
       { $sort: { totalAmount: -1 } },
-      { $limit: limit },
+      { $limit: setting?.leaderboardLimit || 10 },
       { $project: { name: '$realName', totalAmount: 1, count: 1, _id: 0 } },
     ]);
 
-    res.send(renderLeaderboardHTML(donors, user.username, showAmount));
+    // CEK HEADER: Jika yang minta adalah React (Axios), kirim JSON
+    if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      return res.json({
+        donors,
+        settings: {
+          leaderboardLimit: setting?.leaderboardLimit || 10,
+          leaderboardShowAmount: setting?.leaderboardShowAmount !== false
+        }
+      });
+    }
+
+    // Jika dibuka langsung di browser/OBS, kirim HTML
+    res.send(renderLeaderboardHTML(donors, user.username, setting?.leaderboardShowAmount !== false));
   } catch (err) {
     console.error(err);
-    res.status(500).send("Error");
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+exports.stats = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const user = await getUserByToken(token) || await User.findOne({ username: token }).lean();
+    
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const agg = await Donation.aggregate([
+      { 
+        $match: { 
+          userId: new mongoose.Types.ObjectId(user._id), 
+          status: 'PAID' 
+        } 
+      },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+
+    const totalPaid = agg[0]?.total || 0;
+
+    // Selalu kirim JSON untuk endpoint stats
+    res.json({
+      total: totalPaid,
+      username: user.username
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 // ─── HTML RENDERERS ───────────────────────────────────────────────────────────
 
 const renderMilestonesHTML = (milestones, username, totalPaid) => `<!DOCTYPE html>

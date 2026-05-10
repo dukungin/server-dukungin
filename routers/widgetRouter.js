@@ -6,5 +6,6 @@ const widgetCtrl = require('../controllers/widgetController');
 router.get('/:token/milestones',  widgetCtrl.milestones);
 router.get('/:token/leaderboard', widgetCtrl.leaderboard);
 router.get('/:token/qrcode',      widgetCtrl.qrcode);
+router.get('/:token/stats',       widgetCtrl.stats);
 
 module.exports = router;
