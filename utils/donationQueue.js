@@ -15,7 +15,7 @@ const queueItemSchema = new mongoose.Schema({
 
 queueItemSchema.index({ overlayToken: 1, status: 1, enqueuedAt: 1 });
 
-const QueueItem = mongoose.models.QueueItem || mongoose.model('QueueItem', queueItemSchema);
+const QueueItem = mongoose.model('QueueItem', queueItemSchema);
 
 // ============================================================
 // Queue Manager
@@ -55,45 +55,37 @@ class DonationQueueManager {
   // ----------------------------------------------------------
   async _processNext(overlayToken, io) {
     try {
-      // Ambil PENDING tertua secara atomic
-      const item = await QueueItem.findOneAndUpdate(
+        const item = await QueueItem.findOneAndUpdate(
         { overlayToken, status: 'PENDING' },
         { $set: { status: 'PROCESSING', processedAt: new Date() } },
-        { sort: { enqueuedAt: 1 }, new: true }
-      );
+        { sort: { enqueuedAt: 1 }, returnDocument: 'after' }  // ← fix deprecation
+        );
 
-      // Tidak ada lagi → berhenti
-      if (!item) {
+        if (!item) {
         this.processing.set(overlayToken, false);
         return;
-      }
+        }
 
-      this.processing.set(overlayToken, true);
+        this.processing.set(overlayToken, true);
 
-      // Cek apakah OBS online
-      const room = io.sockets.adapter.rooms.get(overlayToken);
-      const clientCount = room ? room.size : 0;
-
-      if (clientCount > 0) {
+        // ✅ Selalu emit — jangan skip meskipun OBS offline
+        // Socket.IO akan buffer kalau pakai Redis adapter, dan overlay akan
+        // langsung terima saat reconnect lewat "join-room" event
         io.to(overlayToken).emit('new-donation', item.payload);
+
         const remaining = await QueueItem.countDocuments({ overlayToken, status: 'PENDING' });
         console.log(`[Queue] ✅ Emit "${item.payload.donorName}" Rp${item.payload.amount} | sisa: ${remaining}`);
-      } else {
-        console.warn(`[Queue] ⚠️ OBS offline — "${item.payload.donorName}" diskip`);
-      }
 
-      // Tandai selesai
-      await QueueItem.findByIdAndUpdate(item._id, { $set: { status: 'DONE' } });
+        await QueueItem.findByIdAndUpdate(item._id, { $set: { status: 'DONE' } });
 
-      // Delay sebelum donasi berikutnya
-      const delay = clientCount > 0 ? item.displayDuration + 500 : 100;
-      setTimeout(() => this._processNext(overlayToken, io), delay);
+        // Delay ke donasi berikutnya
+        setTimeout(() => this._processNext(overlayToken, io), item.displayDuration + 500);
 
     } catch (err) {
-      console.error('[Queue] ❌ processNext error:', err.message);
-      this.processing.set(overlayToken, false);
+        console.error('[Queue] ❌ processNext error:', err.message);
+        this.processing.set(overlayToken, false);
     }
-  }
+    }
 
   // ----------------------------------------------------------
   // Recovery saat server restart — panggil di server.js
