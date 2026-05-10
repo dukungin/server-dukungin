@@ -1,5 +1,6 @@
 const { default: mongoose } = require('mongoose');
 const { User, Donation, Milestone, OverlaySetting } = require('../models');
+require('dotenv').config();
 
 // Helper ambil user by token (untuk OBS URL pakai token seperti overlay)
 const getUserByToken = async (token) => {
@@ -9,26 +10,39 @@ const getUserByToken = async (token) => {
 // ─── MILESTONES WIDGET ────────────────────────────────────────────────────────
 exports.qrcode = async (req, res) => {
   try {
-    // 1. Ambil parameter 'token' dari URL
     const { token } = req.params;
 
-    // 2. Cari user berdasarkan overlayToken ATAU username
     const user = await getUserByToken(token)
       || await User.findOne({ username: token }).lean();
 
-    // 3. Jika tidak ketemu, berikan respon yang jelas
     if (!user) {
-      console.log(`Widget QR: User dengan token/username ${token} tidak ditemukan`);
+      // Jika request JSON, kirim status JSON
+      if (req.headers.accept?.includes('application/json')) {
+        return res.status(404).json({ error: 'User tidak ditemukan' });
+      }
       return res.status(404).send('User tidak ditemukan');
     }
 
-    const donateUrl = `${process.env.FRONTEND_URL || 'https://dukungin.com'}/${user.username}`;
+    // Perbaikan konstruksi URL agar tidak double /donate/
+    const baseUrl = process.env.FRONTEND_URL || 'https://sawer-in.vercel.app';
+    const donateUrl = `${baseUrl}/donate/${user.username}`;
     
-    // 4. Kirim HTML
+    // --- LOGIKA PEMISAH RESPONS ---
+    
+    // 1. Jika yang minta adalah Axios/React (Header Accept: application/json)
+    if (req.headers.accept && req.headers.accept.includes('application/json')) {
+      return res.json({
+        username: user.username,
+        donateUrl: donateUrl
+      });
+    }
+
+    // 2. Jika dibuka langsung di OBS atau Browser (Default: HTML)
     res.send(renderQrCodeHTML(donateUrl, user.username));
+
   } catch (error) {
     console.error("Widget QR Error:", error);
-    res.status(500).send('Internal Server Error');
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 };
 
@@ -69,7 +83,7 @@ exports.milestones = async (req, res) => {
         reached: totalPaid >= target,
       };
     });
-    
+
     if (req.headers.accept && req.headers.accept.includes('application/json')) {
       return res.json(enriched); // Mengirim array milestone yang sudah di-mapping
     }
