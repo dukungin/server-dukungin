@@ -90,13 +90,12 @@ class DonationQueueManager {
   // ----------------------------------------------------------
   // Recovery saat server restart — panggil di server.js
   // ----------------------------------------------------------
-  async recover(io) {
+    async recover(io) {
     try {
-      // Reset yang stuck di PROCESSING karena crash
-      const stuck = await QueueItem.updateMany(
+        const stuck = await QueueItem.updateMany(
         { status: 'PROCESSING' },
         { $set: { status: 'PENDING' } }
-      );
+        );
 
       if (stuck.modifiedCount > 0) {
         console.log(`[Queue] 🔄 ${stuck.modifiedCount} item direset PROCESSING → PENDING`);

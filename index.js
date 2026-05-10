@@ -14,15 +14,37 @@ const io = new Server(server, {
 });
 
 io.on('connection', (socket) => {
-  socket.on('join-room', (token) => {
+
+  socket.on('join-room', async (token) => {
     socket.join(token);
-    console.log(`Client joined room: ${token}`);
+    console.log(`[Socket] Client join room: ${token}`);
+
+    // ✅ Cek apakah ada item PENDING/PROCESSING yang belum di-emit
+    // Ini handle kasus OBS buka setelah donasi masuk
+    const { QueueItem } = require('./utils/donationQueue');
+    const { donationQueue } = require('./utils/donationQueue');
+
+    const pendingCount = await QueueItem.countDocuments({
+      overlayToken: token,
+      status: { $in: ['PENDING', 'PROCESSING'] },
+    });
+
+    if (pendingCount > 0) {
+      console.log(`[Socket] OBS join — ada ${pendingCount} donasi pending, lanjutkan queue`);
+      
+      // Reset PROCESSING → PENDING dulu (kalau ada yang stuck)
+      await QueueItem.updateMany(
+        { overlayToken: token, status: 'PROCESSING' },
+        { $set: { status: 'PENDING' } }
+      );
+
+      // Kick off processing kalau belum jalan
+      if (!donationQueue.processing.get(token)) {
+        donationQueue._processNext(token, io);
+      }
+    }
   });
 
-  socket.on('join-overlay', (token) => {
-    socket.join(token);
-    console.log(`Overlay joined room: ${token}`);
-  });
 });
 
 app.use(cors());
