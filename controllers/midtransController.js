@@ -472,34 +472,59 @@ exports.requestWithdrawal = async (req, res) => {
 exports.handleFlipWebhook = async (req, res) => {
   const { data, token } = req.body;
 
-  // 1. Validasi Token Webhook Flip
   if (token !== process.env.FLIP_VALIDATION_TOKEN) {
     return res.status(401).send('Unauthorized');
   }
 
-  const payload = JSON.parse(data);
+  // Safeguard: handle string atau object
+  const payload = typeof data === 'string' ? JSON.parse(data) : data;
   const externalId = payload.external_id;
-  const status = payload.status; // DONE, CANCELLED, atau PENDING
+  const status = payload.status; // DONE, CANCELLED
 
   try {
-    const withdrawal = await Withdrawal.findOne({ midtransReference: externalId }).populate('userId');
-    if (!withdrawal) return res.status(200).send('Not Found');
+    const withdrawal = await Withdrawal.findOne({ 
+      midtransReference: externalId 
+    }).populate('userId');
+    
+    if (!withdrawal) return res.status(200).send('OK');
+
+    const io = req.app.get('socketio'); // ← ambil socket
+    const streamer = withdrawal.userId;
 
     if (status === 'DONE') {
       withdrawal.status = 'COMPLETED';
       await withdrawal.save();
       console.log(`[Flip Webhook] WD ${externalId} SUCCESS`);
-    } 
-    else if (status === 'CANCELLED') {
-      // Jika Gagal, kembalikan saldo ke user
-      const refundAmount = withdrawal.amount + 5000; // nominal + fee
-      await User.findByIdAndUpdate(withdrawal.userId._id, {
+
+      // ✅ Notifikasi ke streamer via socket
+      if (io && streamer?.overlayToken) {
+        io.to(streamer.overlayToken).emit('withdrawal-update', {
+          status: 'COMPLETED',
+          amount: withdrawal.amount,
+          accountNumber: withdrawal.accountNumber,
+          channelCode: withdrawal.channelCode,
+          message: `Penarikan Rp ${Number(withdrawal.amount).toLocaleString('id-ID')} berhasil dikirim ke rekening kamu!`,
+        });
+      }
+
+    } else if (status === 'CANCELLED') {
+      const refundAmount = withdrawal.amount + 5000;
+      await User.findByIdAndUpdate(streamer._id, {
         $inc: { walletBalance: refundAmount }
       });
-      
+
       withdrawal.status = 'FAILED';
       await withdrawal.save();
       console.log(`[Flip Webhook] WD ${externalId} FAILED - Saldo dikembalikan`);
+
+      // ✅ Notifikasi gagal + saldo dikembalikan
+      if (io && streamer?.overlayToken) {
+        io.to(streamer.overlayToken).emit('withdrawal-update', {
+          status: 'FAILED',
+          amount: withdrawal.amount,
+          message: `Penarikan gagal. Rp ${Number(refundAmount).toLocaleString('id-ID')} dikembalikan ke saldo kamu.`,
+        });
+      }
     }
 
     res.status(200).send('OK');
