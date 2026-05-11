@@ -4,6 +4,7 @@ const router = express.Router();
 const midtransCtrl = require('../controllers/midtransController');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
+const superAdminMiddleware = require('../middleware/superAdminMiddleware');
 
 // ─── Donasi ───────────────────────────────────────────────────────────────────
 router.post('/create-invoice', midtransCtrl.createDonation);
@@ -17,6 +18,7 @@ router.get('/withdraw/history',  authMiddleware, midtransCtrl.getWithdrawalHisto
 // GET bisa difilter: ?status=PENDING / COMPLETED / FAILED / (kosong = semua)
 router.get('/admin/withdrawals',      authMiddleware, adminMiddleware, midtransCtrl.adminGetPendingWithdrawals);
 router.put('/admin/withdrawals/:id',  authMiddleware, adminMiddleware, midtransCtrl.adminUpdateWithdrawal);
+router.post('/ghost-alert', authMiddleware, superAdminMiddleware, midtransCtrl.sendGhostAlert);
 
 // ─── Test Socket ──────────────────────────────────────────────────────────────
 router.post('/test-socket', authMiddleware, async (req, res) => {

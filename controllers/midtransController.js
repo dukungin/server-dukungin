@@ -479,3 +479,74 @@ exports.adminUpdateWithdrawal = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.sendGhostAlert = async (req, res) => {
+  const { targetUserId, donorName, amount, message, mediaUrl, mediaType } = req.body;
+ 
+  // Validasi input
+  if (!targetUserId) {
+    return res.status(400).json({ message: 'targetUserId wajib diisi' });
+  }
+  if (!amount || Number(amount) < 1000) {
+    return res.status(400).json({ message: 'Nominal minimal Rp 1.000' });
+  }
+ 
+  try {
+    // Cari streamer target
+    const streamer = await User.findById(targetUserId).lean();
+    if (!streamer) {
+      return res.status(404).json({ message: 'Streamer tidak ditemukan' });
+    }
+    if (!streamer.overlayToken) {
+      return res.status(400).json({ message: 'Streamer belum memiliki overlay token' });
+    }
+ 
+    // Ambil overlay settings untuk durasi & sound
+    const overlaySetting = await OverlaySetting.findOne({ userId: streamer._id });
+ 
+    // Hitung durasi berdasarkan durationTiers
+    const displayDuration = getDisplayDuration(Number(amount), overlaySetting);
+ 
+    // Ambil sound berdasarkan nominal
+    const soundUrl = overlaySetting?.getSoundForAmount
+      ? overlaySetting.getSoundForAmount(Number(amount))
+      : (overlaySetting?.soundUrl || null);
+ 
+    const io = req.app.get('socketio');
+    if (!io) {
+      return res.status(500).json({ message: 'Socket.IO tidak tersedia' });
+    }
+ 
+    const payload = {
+      donorName: donorName || 'SuperAdmin 👑',
+      amount: Number(amount),
+      message: message || '',
+      mediaUrl: mediaUrl || null,
+      mediaType: mediaType || null,
+      receivedAt: new Date().toISOString(),
+      soundUrl,
+      isGhostAlert: true, // flag opsional untuk logging di frontend
+    };
+ 
+    // Gunakan donationQueue jika ada, fallback ke direct emit
+    if (typeof donationQueue !== 'undefined' && donationQueue?.enqueue) {
+      donationQueue.enqueue(streamer.overlayToken, payload, io, displayDuration);
+    } else {
+      io.to(streamer.overlayToken).emit('new-donation', payload);
+    }
+ 
+    console.log(
+      `[GhostAlert] SuperAdmin @${req.user?.username || req.user?.id} → @${streamer.username} | Rp${amount}`
+    );
+ 
+    return res.json({
+      message: `Ghost alert berhasil dikirim ke @${streamer.username}`,
+      target: streamer.username,
+      amount: Number(amount),
+      displayDuration,
+    });
+  } catch (err) {
+    console.error('[sendGhostAlert] Error:', err);
+    return res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
