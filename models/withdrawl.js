@@ -41,6 +41,7 @@ const withdrawalSchema = new mongoose.Schema(
       default: 'PENDING',
     },
     midtransReference: String,
+    note: { type: String, default: null },
   },
   { timestamps: true }
 );
