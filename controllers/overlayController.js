@@ -82,9 +82,10 @@ exports.updateSettings = async (req, res) => {
 // ============================================================
 exports.getPublicProfile = async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.params.username })
-      .select('username _id followersCount followingCount') // tambah stats jika ada
-      .lean();
+    const user = await User.findOne(
+      { username: req.params.username },
+      'username _id bio instagram facebook youtube twitter followersCount followingCount' // ← TAMBAHKAN INI
+    ).lean();
 
     if (!user) return res.status(404).json({ message: 'Streamer tidak ditemukan' });
 
@@ -92,11 +93,19 @@ exports.getPublicProfile = async (req, res) => {
 
     res.json({
       ...user,
+      // Pastikan social media ikut terkirim
+      bio: user.bio || '',
+      instagram: user.instagram || '',
+      facebook: user.facebook || '',
+      youtube: user.youtube || '',
+      twitter: user.twitter || '',
       followersCount: user.followersCount || 0,
       followingCount: user.followingCount || 0,
       overlaySetting,
+      OverlaySetting: overlaySetting, // untuk kompatibilitas lama
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: err.message });
   }
 };
