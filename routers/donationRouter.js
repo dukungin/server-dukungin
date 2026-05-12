@@ -11,5 +11,6 @@ router.get('/history', authMiddleware, donationCtrl.getDonationHistory);
 // Statistik ringkasan donasi
 // GET /api/donations/stats
 router.get('/stats', authMiddleware, donationCtrl.getDonationStats);
+router.get('/my-donations', authMiddleware, donationCtrl.getMyDonations);
 
 module.exports = router;

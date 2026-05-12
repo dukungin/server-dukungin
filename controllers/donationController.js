@@ -91,3 +91,32 @@ exports.getDonationStats = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: err.message });
   }
 };
+
+exports.getMyDonations = async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const skip = (page - 1) * limit;
+
+    const donations = await Donation.find({ donorId: req.user.id })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .populate('userId', 'username');
+
+    const total = await Donation.countDocuments({ donorId: req.user.id });
+
+    res.json({
+      donations: donations.map(d => ({
+        ...d.toObject(),
+        streamerUsername: d.userId?.username
+      })),
+      pagination: {
+        total,
+        page: Number(page),
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
