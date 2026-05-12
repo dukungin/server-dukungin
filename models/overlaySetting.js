@@ -64,6 +64,7 @@ const overlaySettingSchema = new mongoose.Schema(
     theme:           { type: String, default: 'modern' },
     primaryColor:    { type: String, default: '#6366f1' },
     textColor:       { type: String, default: '#ffffff' },
+    highlightColor:  { type: String, default: '#a5b4fc' },
     animation:       { type: String, default: 'bounce' },
     borderColor:     { type: String, default: '#ffffff26' }, 
     maxWidth:        { type: Number, default: 280 },

@@ -41,6 +41,7 @@ exports.updateSettings = async (req, res) => {
       'baseDuration', 'extraPerAmount', 'extraDuration',
       'durationTiers', 'mediaTriggers',
       'soundUrl', 'customCss',
+      'highlightColor',
       'soundTiers',
       'leaderboardShowAmount', 
       'quickAmounts',
