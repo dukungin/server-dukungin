@@ -82,10 +82,9 @@ exports.updateSettings = async (req, res) => {
 // ============================================================
 exports.getPublicProfile = async (req, res) => {
   try {
-    const user = await User.findOne(
-      { username: req.params.username },
-      'username _id'
-    ).lean();
+    const user = await User.findOne({ username: req.params.username })
+      .select('username _id followersCount followingCount') // tambah stats jika ada
+      .lean();
 
     if (!user) return res.status(404).json({ message: 'Streamer tidak ditemukan' });
 
@@ -93,11 +92,12 @@ exports.getPublicProfile = async (req, res) => {
 
     res.json({
       ...user,
+      followersCount: user.followersCount || 0,
+      followingCount: user.followingCount || 0,
       overlaySetting,
-      OverlaySetting: overlaySetting,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
