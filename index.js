@@ -53,6 +53,7 @@ const bannedWordRoutes = require('./routers/bannedWordRouter');
 const widgetRoutes     = require('./routers/widgetRouter');
 const subathonRoutes   = require('./routers/subathonRouter');
 const pollRoutes       = require('./routers/pollRouter');
+const testAlertRoutes = require('./routers/testAlertRouter');
 
 app.get('/testing', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running!', node_env: process.env.NODE_ENV });
@@ -68,6 +69,7 @@ app.use('/api/banned-words', bannedWordRoutes);
 app.use('/widget',           widgetRoutes);
 app.use('/api/subathon',     subathonRoutes);
 app.use('/api/polls',        pollRoutes);
+app.use('/api/test-alert', testAlertRoutes);
 
 const PORT = process.env.PORT || 5101;
 
