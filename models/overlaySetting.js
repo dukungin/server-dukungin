@@ -88,6 +88,11 @@ const overlaySettingSchema = new mongoose.Schema(
     leaderboardShowAmount: { type: Boolean, default: true },
     leaderboardLimit:      { type: Number, default: 10 },
     leaderboardPeriod:     { type: String, enum: ['alltime', 'today'], default: 'alltime' },
+
+    quickAmounts: {
+      type: [Number],
+      default: [10000, 25000, 50000, 100000, 250000]
+    },
   },
   { timestamps: true }
 );

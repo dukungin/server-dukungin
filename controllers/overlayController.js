@@ -43,6 +43,7 @@ exports.updateSettings = async (req, res) => {
       'soundUrl', 'customCss',
       'soundTiers',
       'leaderboardShowAmount', 
+      'quickAmounts',
       'leaderboardLimit', 
       'leaderboardPeriod',
 
