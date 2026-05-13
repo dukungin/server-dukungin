@@ -5,6 +5,7 @@ const midtransCtrl = require('../controllers/midtransController');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const superAdminMiddleware = require('../middleware/superAdminMiddleware');
+const { User } = require('../models');
 
 // ─── Donasi ───────────────────────────────────────────────────────────────────
 router.post('/create-invoice', midtransCtrl.createDonation);
