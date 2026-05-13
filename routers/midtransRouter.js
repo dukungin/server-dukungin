@@ -21,7 +21,22 @@ router.put('/admin/withdrawals/:id',  authMiddleware, adminMiddleware, midtransC
 router.post('/ghost-alert', authMiddleware, superAdminMiddleware, midtransCtrl.sendGhostAlert);
 router.get('/admin/users', authMiddleware, superAdminMiddleware, midtransCtrl.getAllUsers);
 router.get('/badges', authMiddleware, midtransCtrl.getUserBadges);
-
+// ✅ TAMBAH ENDPOINT INI
+router.get('/badges/public/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId).select('donationMilestones donorMilestones');
+    
+    res.json({
+      badges: {
+        streamer: user.donationMilestones || {},
+        donor: user.donorMilestones || {}
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch public badges' });
+  }
+});
 // ─── Test Socket ──────────────────────────────────────────────────────────────
 router.post('/test-socket', authMiddleware, async (req, res) => {
   const io = req.app.get('socketio');
