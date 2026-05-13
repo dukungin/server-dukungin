@@ -217,13 +217,13 @@ class DonationQueueManager {
       this.processing.set(overlayToken, true);
       console.log('items', item.payload)
       // ── Emit new-media-donation ke MediaShareOverlay (hanya kalau ada media) ──
-      if (item.payload.mediaUrl !== '' || item.payload.mediaUrl !== null) {
-        io.to(overlayToken).emit('new-media-donation', item.payload);
-        console.log(`[Queue] 🎬 Emit new-media-donation "${item.payload.donorName}"`);
-      }
+      if (item.payload.mediaUrl && item.payload.mediaUrl !== '') {
+          io.to(overlayToken).emit('new-media-donation', item.payload);
+          console.log(`[Queue] 🎬 Emit new-media-donation "${item.payload.donorName}"`);
+        }
 
-      // ── Emit new-donation ke OverlayAlert (selalu) ──
-      io.to(overlayToken).emit('new-donation', item.payload);
+        // Emit new-donation ke OverlayAlert (selalu)
+        io.to(overlayToken).emit('new-donation', item.payload);
 
       const remaining = await QueueItem.countDocuments({ overlayToken, status: 'PENDING' });
       console.log(`[Queue] ✅ Emit "${item.payload.donorName}" Rp${item.payload.amount} | sisa: ${remaining}`);
