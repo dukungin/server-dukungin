@@ -717,7 +717,7 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-const getUserBadges = async (req, res) => {
+exports.getUserBadges = async (req, res) => {
   try {
     const userId = req.user.id;
     const user = await User.findById(userId).select('donationMilestones donorMilestones');
