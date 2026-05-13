@@ -1097,10 +1097,10 @@ exports.sendGhostAlert = async (req, res) => {
       donationQueue.enqueue(streamer.overlayToken, payload, io, displayDuration);
     } else {
       // Fallback manual
-      io.to(streamer.overlayToken).emit('new-donation', payload);
       if (payload.mediaUrl) {
         io.to(streamer.overlayToken).emit('new-media-donation', payload);
       }
+      io.to(streamer.overlayToken).emit('new-donation', payload);
     }
 
     console.log(`[GhostAlert] @${req.user?.username} → @${streamer.username} | Rp${amount} | media: ${mediaUrl || 'none'}`);

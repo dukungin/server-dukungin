@@ -215,15 +215,15 @@ class DonationQueueManager {
       }
 
       this.processing.set(overlayToken, true);
-
-      // ── Emit new-donation ke OverlayAlert (selalu) ──
-      io.to(overlayToken).emit('new-donation', item.payload);
-
+      console.log('items', item.payload)
       // ── Emit new-media-donation ke MediaShareOverlay (hanya kalau ada media) ──
       if (item.payload.mediaUrl) {
         io.to(overlayToken).emit('new-media-donation', item.payload);
         console.log(`[Queue] 🎬 Emit new-media-donation "${item.payload.donorName}"`);
       }
+
+      // ── Emit new-donation ke OverlayAlert (selalu) ──
+      io.to(overlayToken).emit('new-donation', item.payload);
 
       const remaining = await QueueItem.countDocuments({ overlayToken, status: 'PENDING' });
       console.log(`[Queue] ✅ Emit "${item.payload.donorName}" Rp${item.payload.amount} | sisa: ${remaining}`);
