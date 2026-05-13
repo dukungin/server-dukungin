@@ -40,6 +40,7 @@ class DonationQueueManager {
         status: { $in: ['PENDING', 'PROCESSING'] },
       });
 
+      console.log(`[Porifile donatur] "${payload}"`);
       console.log(`[Queue] "${payload.donorName}" masuk antrian — posisi: ${queueLength}`);
 
       if (!this.processing.get(overlayToken)) {
