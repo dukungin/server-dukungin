@@ -5,7 +5,8 @@ const midtransCtrl = require('../controllers/midtransController');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const superAdminMiddleware = require('../middleware/superAdminMiddleware');
-const { User } = require('../models');
+const { User, OverlaySetting, Donation } = require('../models');
+const { donationQueue } = require('../utils/donationQueue');
 
 // ─── Donasi ───────────────────────────────────────────────────────────────────
 router.post('/create-invoice', midtransCtrl.createDonation);
@@ -83,6 +84,66 @@ router.post('/test-mediashare/send', authMiddleware, async (req, res) => {
     message: '✅ Test MediaShare lengkap terkirim!',
     preview: payload
   });
+});
+
+router.post('/replay-donation/:donationId', authMiddleware, async (req, res) => {
+  const { donationId } = req.params;
+  
+  try {
+    // 1. Cari donation
+    const donation = await Donation.findById(donationId)
+      .populate('userId', 'username overlayToken')
+      .lean();
+    
+    if (!donation) {
+      return res.status(404).json({ message: 'Donasi tidak ditemukan' });
+    }
+
+    const streamer = donation.userId;
+    if (!streamer?.overlayToken) {
+      return res.status(400).json({ message: 'Streamer tidak memiliki overlay token' });
+    }
+
+    // 2. Buat payload replay
+    const payload = {
+      donorName: donation.donorName,
+      amount: donation.amount,
+      message: donation.message,
+      mediaUrl: donation.mediaUrl || null,
+      mediaType: donation.mediaType || null,
+      receivedAt: new Date().toISOString(),
+      soundUrl: null, // Gunakan default overlay
+      isReplay: true, // Flag untuk frontend
+    };
+
+    // 3. Emit ke room yang tepat
+    const io = req.app.get('socketio');
+    if (!io) {
+      return res.status(500).json({ message: 'Socket.IO tidak tersedia' });
+    }
+
+    // Gunakan queue untuk replay juga (urutan & timing sama)
+    const overlaySetting = await OverlaySetting.findOne({ userId: streamer._id });
+    const displayDuration = getDisplayDuration(donation.amount, overlaySetting);
+
+    donationQueue.enqueue(streamer.overlayToken, payload, io, displayDuration);
+
+    console.log(`[Replay] "${donation.donorName}" Rp${donation.amount} → @${streamer.username}`);
+
+    res.json({
+      success: true,
+      message: `Replay berhasil dikirim ke OBS!`,
+      donation: {
+        donor: donation.donorName,
+        amount: donation.amount,
+        hasMedia: !!donation.mediaUrl,
+        duration: displayDuration / 1000 + 's',
+      },
+    });
+  } catch (err) {
+    console.error('[Replay Donation] Error:', err);
+    res.status(500).json({ message: 'Gagal replay donasi', error: err.message });
+  }
 });
 
 module.exports = router;

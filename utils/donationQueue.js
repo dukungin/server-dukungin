@@ -43,40 +43,75 @@ class DonationQueueManager {
 
   async _processNext(overlayToken, io) {
     try {
+      // 1. Ambil item PENDING pertama (FIFO)
       const item = await QueueItem.findOneAndUpdate(
         { overlayToken, status: 'PENDING' },
         { $set: { status: 'PROCESSING', processedAt: new Date() } },
-        { sort: { enqueuedAt: 1 }, returnDocument: 'after' }
+        { 
+          sort: { enqueuedAt: 1 }, // FIFO
+          returnDocument: 'after' 
+        }
       );
 
       if (!item) {
+        // ✅ No more pending → stop processing
         this.processing.set(overlayToken, false);
         return;
       }
 
+      // 2. Mark as processing
       this.processing.set(overlayToken, true);
-      console.log('items', item.payload)
-      // Di dalam _processNext function, ganti bagian emit:
-      if (item.payload.mediaUrl && item.payload.mediaUrl.trim() !== '') {
-        // ✅ Emit ke MEDIASHARE ROOM
-        io.to(`${overlayToken}-mediashare`).emit('new-media-donation', item.payload);
-        console.log(`[Queue] 🎬 MediaShare "${item.payload.donorName}"`);
+
+      // 3. Prepare payload
+      const payload = {
+        ...item.payload,
+        isReplay: item.payload.isReplay || false,
+        queuePosition: await this.getQueueLength(overlayToken),
+      };
+
+      console.log(`[Queue] 🔄 PROCESSING "${payload.donorName}" | Replay: ${payload.isReplay} | Media: ${!!payload.mediaUrl}`);
+
+      // 4. Emit ke room yang tepat
+      if (payload.mediaUrl && payload.mediaUrl.trim() !== '') {
+        // 🎬 MediaShare room
+        io.to(`${overlayToken}-mediashare`).emit('new-media-donation', payload);
+        console.log(`[Queue] 🎬 MediaShare → "${payload.donorName}" Rp${payload.amount}`);
       } else {
-        // ✅ Emit ke OVERLAY ROOM biasa
-        io.to(overlayToken).emit('new-donation', item.payload);
-        console.log(`[Queue] 💜 OverlayAlert "${item.payload.donorName}"`);
+        // 💜 Regular overlay
+        io.to(overlayToken).emit('new-donation', payload);
+        console.log(`[Queue] 💜 OverlayAlert → "${payload.donorName}" Rp${payload.amount}`);
       }
 
-      const remaining = await QueueItem.countDocuments({ overlayToken, status: 'PENDING' });
-      console.log(`[Queue] ✅ Emit "${item.payload.donorName}" Rp${item.payload.amount} | sisa: ${remaining}`);
+      // 5. Mark as DONE
+      await QueueItem.findByIdAndUpdate(
+        item._id, 
+        { $set: { status: 'DONE' } }
+      );
 
-      await QueueItem.findByIdAndUpdate(item._id, { $set: { status: 'DONE' } });
+      // 6. Hitung sisa queue
+      const remaining = await QueueItem.countDocuments({ 
+        overlayToken, 
+        status: 'PENDING' 
+      });
+      console.log(`[Queue] ✅ "${payload.donorName}" DONE | Sisa: ${remaining}`);
 
-      setTimeout(() => this._processNext(overlayToken, io), item.displayDuration + 500);
+      // 7. Schedule next item
+      const nextDelay = item.displayDuration + 500; // +500ms buffer
+      setTimeout(() => this._processNext(overlayToken, io), nextDelay);
 
     } catch (err) {
-      console.error('[Queue] ❌ processNext error:', err.message);
+      console.error('[Queue] ❌ _processNext ERROR:', err.message);
+      
+      // ✅ Reset processing state on error
       this.processing.set(overlayToken, false);
+      
+      // ✅ Optional: retry after 5s
+      setTimeout(() => {
+        if (!this.processing.get(overlayToken)) {
+          console.log(`[Queue] 🔄 Retry ${overlayToken} in 5s...`);
+          this._processNext(overlayToken, io);
+        }
+      }, 5000);
     }
   }
 
