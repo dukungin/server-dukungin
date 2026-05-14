@@ -81,7 +81,7 @@ const overlaySettingSchema = new mongoose.Schema(
     // ── Media Triggers ───────────────────────────────────────────────────────
     mediaTriggers: { type: [mediaTriggerSchema], default: [] },
     soundTiers: { type: [soundTierSchema], default: [] },
-
+    minVoteAmount: { type: Number, default: 1000 },
     // ── Misc ────────────────────────────────────────────────────────────────
     soundUrl:  String,
     customCss: String,

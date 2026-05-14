@@ -13,7 +13,10 @@ const pollSchema = new mongoose.Schema({
   
   // Voters — simpan email untuk 1 email 1 vote
   voters: [{ type: String }], // array of email
-  
+  pollVote: {
+    pollId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Poll', default: null },
+    optionId: { type: String, default: null },
+  },
   // Tampilan OBS
   showResults: { type: Boolean, default: true }, // tampilkan % di OBS saat voting berlangsung
 }, { timestamps: true });
