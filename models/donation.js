@@ -43,5 +43,6 @@ donationSchema.index({ userId: 1, createdAt: -1 });
 donationSchema.index({ donorUserId: 1, createdAt: -1 });
 donationSchema.index({ status: 1 });
 donationSchema.index({ donorUserId: 1, userId: 1 });
+donationSchema.index({ streamerUsername: 1, status: 1 });
 
 module.exports = mongoose.model('Donation', donationSchema);

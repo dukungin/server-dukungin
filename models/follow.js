@@ -11,5 +11,6 @@ const followSchema = new mongoose.Schema(
 
 // Pastikan tidak bisa follow orang yang sama dua kali
 followSchema.index({ follower: 1, following: 1 }, { unique: true });
-
+followSchema.index({ followingId: 1 });
+followSchema.index({ followerId: 1 });
 module.exports = mongoose.model('Follow', followSchema);

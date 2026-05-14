@@ -142,7 +142,7 @@ class DonationQueueManager {
     } catch (err) {
       console.error('[Queue] ❌ Recovery error:', err.message);
     }
-  }
+  } 
 
   async getQueueLength(overlayToken) {
     return await QueueItem.countDocuments({

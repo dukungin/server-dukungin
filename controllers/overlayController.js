@@ -81,33 +81,136 @@ exports.updateSettings = async (req, res) => {
 // ============================================================
 // GET PUBLIC PROFILE — untuk halaman donasi (berdasarkan username)
 // ============================================================
+// controllers/overlayController.js - VERSI SUPER OPTIMIZED
 exports.getPublicProfile = async (req, res) => {
   try {
-    const user = await User.findOne(
-      { username: req.params.username },
-      'username _id bio instagram facebook youtube twitter followersCount followingCount' // ← TAMBAHKAN INI
-    ).lean();
+    const { username } = req.params;
+    
+    // ✅ 1 MONGO AGGREGATE QUERY - SUPER CEPAT!
+    const [result] = await User.aggregate([
+      // 1. Match user
+      { $match: { username } },
+      
+      // 2. Project fields
+      {
+        $project: {
+          username: 1,
+          fullName: 1,
+          bio: { $ifNull: ['$bio', ''] },
+          instagram: { $ifNull: ['$instagram', ''] },
+          facebook: { $ifNull: ['$facebook', ''] },
+          youtube: { $ifNull: ['$youtube', ''] },
+          twitter: { $ifNull: ['$twitter', ''] },
+          totalDonations: { $ifNull: ['$totalDonations', 0] },
+          totalDonationCount: { $ifNull: ['$totalDonationCount', 0] },
+          donationMilestones: { $ifNull: ['$donationMilestones', {}] },
+          _id: 1
+        }
+      },
+      
+      // 3. Followers count (LEFT JOIN)
+      {
+        $lookup: {
+          from: 'follows',
+          let: { userId: '$_id' },
+          pipeline: [
+            { $match: { 
+              $expr: { $eq: ['$followingId', '$$userId'] } 
+            }},
+            { $count: 'followersCount' }
+          ],
+          as: 'followersData'
+        }
+      },
+      
+      // 4. Following count
+      {
+        $lookup: {
+          from: 'follows', 
+          let: { userId: '$_id' },
+          pipeline: [
+            { $match: { 
+              $expr: { $eq: ['$followerId', '$$userId'] } 
+            }},
+            { $count: 'followingCount' }
+          ],
+          as: 'followingData'
+        }
+      },
+      
+      // 5. Supporters (donations)
+      {
+        $lookup: {
+          from: 'donations',
+          let: { username: '$username' },
+          pipeline: [
+            { $match: { 
+              $expr: { 
+                $and: [
+                  { $eq: ['$streamerUsername', '$$username'] },
+                  { $eq: ['$status', 'PAID'] }
+                ]
+              }
+            }},
+            { $count: 'supportersCount' }
+          ],
+          as: 'supportersData'
+        }
+      },
+      
+      // 6. Overlay settings
+      {
+        $lookup: {
+          from: 'overlaySettings',
+          localField: '_id',
+          foreignField: 'userId',
+          as: 'overlaySetting'
+        }
+      },
+      
+      // 7. Flatten arrays
+      {
+        $addFields: {
+          followersCount: { $ifNull: [{ $arrayElemAt: ['$followersData.followersCount', 0] }, 0] },
+          followingCount: { $ifNull: [{ $arrayElemAt: ['$followingData.followingCount', 0] }, 0] },
+          supportersCount: { $ifNull: [{ $arrayElemAt: ['$supportersData.supportersCount', 0] }, 0] },
+          overlaySetting: { $arrayElemAt: ['$overlaySetting', 0] }
+        }
+      },
+      
+      // 8. Final projection
+      {
+        $project: {
+          username: 1,
+          fullName: 1,
+          bio: 1,
+          instagram: 1,
+          facebook: 1,
+          youtube: 1,
+          twitter: 1,
+          followersCount: 1,
+          followingCount: 1,
+          supportersCount: 1,
+          totalDonations: 1,
+          totalDonationCount: 1,
+          donationMilestones: 1,
+          overlaySetting: 1
+        }
+      }
+    ]);
 
-    if (!user) return res.status(404).json({ message: 'Streamer tidak ditemukan' });
-
-    const overlaySetting = await OverlaySetting.findOne({ userId: user._id }).lean();
+    if (!result.length) {
+      return res.status(404).json({ message: 'Streamer tidak ditemukan' });
+    }
 
     res.json({
-      ...user,
-      // Pastikan social media ikut terkirim
-      bio: user.bio || '',
-      instagram: user.instagram || '',
-      facebook: user.facebook || '',
-      youtube: user.youtube || '',
-      twitter: user.twitter || '',
-      followersCount: user.followersCount || 0,
-      followingCount: user.followingCount || 0,
-      overlaySetting,
-      OverlaySetting: overlaySetting, // untuk kompatibilitas lama
+      ...result[0],
+      OverlaySetting: result[0].overlaySetting // Kompatibilitas
     });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: err.message });
+    console.error('❌ getPublicProfile aggregate error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
