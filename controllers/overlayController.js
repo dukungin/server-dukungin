@@ -118,3 +118,21 @@ exports.getOverlaySettings = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.uploadPublicSound = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Tidak ada file audio' });
+    }
+
+    const audioUrl = `${process.env.BASE_URL}/uploads/audio/${req.file.filename}`;
+    
+    res.json({
+      message: 'Audio uploaded successfully',
+      url: audioUrl,
+      filename: req.file.filename
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

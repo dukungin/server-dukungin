@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const connectDB = require('./config/database');
 const { donationQueue, QueueItem } = require('./utils/donationQueue');
+const path = require('path'); // ❌ Missing ini!
 
 const app = express();
 const server = http.createServer(app);
@@ -41,6 +42,7 @@ io.on('connection', (socket) => {
 app.use(cors());
 app.use(express.json());
 app.set('socketio', io);
+app.use('/uploads/audio', express.static(path.join(__dirname, 'uploads/audio')));
 
 // Routes
 const overlayRoutes    = require('./routers/overlayRouter');
