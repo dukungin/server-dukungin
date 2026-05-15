@@ -492,46 +492,46 @@
     if (amt < 10000)
       return res.status(400).json({ message: 'Minimal penarikan adalah Rp 10.000' });
     if (amt > 10000000)
-      return res.status(400).json({ message: 'Maksimal penarikan adalah Rp 10.000.000 per transaksi' });
+      return res.status(400).json({ message: 'Maksimal penarikan adalah Rp 10.000.000' });
     if (!channelCode || !accountNumber || !accountName)
-      return res.status(400).json({ message: 'Data rekening/e-wallet tidak lengkap' });
+      return res.status(400).json({ message: 'Data rekening tidak lengkap' });
 
-    const FEE = 5000;
+    const FEE         = 5000;
+    const MIN_TARIK   = 10000;
+    const MIN_BALANCE = 10000; // ✅ Konsisten 10K
     const totalDeduct = amt + FEE;
-    const MIN_BALANCE = 20000;
     const referenceNo = `wd-${userId}-${Date.now()}`;
 
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
+      // ✅ 1. CEK SALDO SEKARANG
+      const existingUser = await User.findById(userId).session(session);
+      const currentBalance = parseFloat(existingUser.walletBalance || 0);
+
+      if (currentBalance < MIN_BALANCE) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          message: `Saldo minimum Rp ${MIN_BALANCE.toLocaleString('id-ID')}`,
+        });
+      }
+
+      if (currentBalance < totalDeduct) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          message: `Saldo tidak cukup. Dibutuhkan Rp ${totalDeduct.toLocaleString('id-ID')} (Rp ${amt.toLocaleString('id-ID')} + fee Rp ${FEE.toLocaleString('id-ID')})`,
+        });
+      }
+
+      // ✅ 2. POTONG SALDO & CREATE WITHDRAWAL (ATOMIC)
       const user = await User.findOneAndUpdate(
-        {
-          _id: userId,
-          walletBalance: { $gte: Math.max(totalDeduct, MIN_BALANCE) },
-        },
+        { _id: userId, walletBalance: { $gte: totalDeduct } },
         { $inc: { walletBalance: -totalDeduct } },
         { new: true, session }
       );
-
-      if (!user) {
-        await session.abortTransaction();
-        session.endSession();
-
-        const existingUser = await User.findById(userId);
-        if (!existingUser)
-          return res.status(404).json({ message: 'User tidak ditemukan' });
-
-        const currentBalance = parseFloat(existingUser.walletBalance || 0);
-        if (currentBalance < MIN_BALANCE)
-          return res.status(400).json({
-            message: `Saldo minimum untuk penarikan adalah Rp 20.000. Saldo kamu saat ini Rp ${currentBalance.toLocaleString('id-ID')}`,
-          });
-
-        return res.status(400).json({
-          message: `Saldo tidak mencukupi. Dibutuhkan Rp ${totalDeduct.toLocaleString('id-ID')} (termasuk biaya admin Rp 5.000)`,
-        });
-      }
 
       await Withdrawal.create([{
         userId,
@@ -549,16 +549,17 @@
       session.endSession();
 
       res.json({
-        message: 'Permintaan penarikan berhasil diajukan. Dana akan diproses admin dalam 1x24 jam.',
+        message: '✅ Penarikan berhasil diajukan!',
         referenceNo,
         status: 'PENDING',
+        detail: `Rp ${amt.toLocaleString('id-ID')} → ${channelCode} ${accountNumber}`,
       });
 
     } catch (err) {
       if (session.inTransaction()) await session.abortTransaction();
       session.endSession();
       console.error('[requestWithdrawal] Error:', err);
-      res.status(500).json({ message: 'Terjadi kesalahan sistem', error: err.message });
+      res.status(500).json({ message: 'Terjadi kesalahan', error: err.message });
     }
   };
 
