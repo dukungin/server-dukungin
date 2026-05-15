@@ -4,6 +4,7 @@ const router = express.Router();
 const overlayCtrl = require('../controllers/overlayController');
 const authMiddleware = require('../middleware/authMiddleware');
 const { audioUpload } = require('../middleware/multerConfig');
+const { proxyAudio } = require('../utils/proxyAudio');
 
 router.get('/settings',         authMiddleware, overlayCtrl.getSettings);      // ← bukan getOverlaySettings
 router.put('/settings',         authMiddleware, overlayCtrl.updateSettings);   // ← ganti POST ke PUT
@@ -16,39 +17,53 @@ router.post('/upload-audio', authMiddleware, audioUpload.single('audio'), overla
 router.get('/proxy-audio', async (req, res) => {
   try {
     const { url } = req.query;
-    if (!url) {
-      return res.status(400).json({ message: 'Missing URL parameter' });
-    }
+    if (!url) return res.status(400).json({ message: 'Missing URL' });
 
-    console.log('🔄 Proxying audio:', url);
+    console.log('🔄 Proxying:', url);
+
+    // ✅ FOLLOW REDIRECTS & EXTRACT AUDIO
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; DukunginAudioProxy/1.0)'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(`HTTP ${response.status}`);
     }
 
-    const buffer = await response.arrayBuffer();
+    const contentType = response.headers.get('content-type') || '';
     
-    res.set({
-      'Content-Type': response.headers.get('content-type') || 'audio/mpeg',
-      'Content-Length': buffer.byteLength,
-      'Cache-Control': 'public, max-age=3600',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
-    });
+    // ✅ JIKA HTML (MyInstants page) → cari MP3 link
+    if (contentType.includes('text/html')) {
+      const html = await response.text();
+      const mp3Match = html.match(/https:\/\/www\.myinstants\.com\/media\/sounds\/[^'"\s]+\.mp3/);
+      if (mp3Match) {
+        console.log('🔍 Found MP3:', mp3Match[0]);
+        return proxyAudio(mp3Match[0], res);
+      }
+      throw new Error('No MP3 found in HTML');
+    }
 
-    res.send(Buffer.from(buffer));
+    // ✅ AUDIO DIRECT
+    if (contentType.startsWith('audio/')) {
+      const buffer = await response.arrayBuffer();
+      return sendAudioBuffer(buffer, response.headers, res);
+    }
+
+    throw new Error('Not an audio file');
   } catch (err) {
-    console.error('❌ Audio proxy failed:', err.message);
-    res.status(500).json({ 
-      message: 'Failed to proxy audio', 
-      error: err.message 
+    console.error('❌ Proxy failed:', err.message);
+    res.status(400).json({ 
+      message: 'Invalid audio URL', 
+      error: err.message,
+      hint: 'Gunakan direct MP3 link (.mp3, .wav, .ogg)'
     });
   }
 });
