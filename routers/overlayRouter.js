@@ -9,31 +9,49 @@ router.get('/settings',         authMiddleware, overlayCtrl.getSettings);      /
 router.put('/settings',         authMiddleware, overlayCtrl.updateSettings);   // ← ganti POST ke PUT
 router.get('/public/:username', overlayCtrl.getPublicProfile);
 router.get('/config/:token',    overlayCtrl.getOverlaySettings);
+// ✅ Upload audio publik
 router.post('/upload-audio', authMiddleware, audioUpload.single('audio'), overlayCtrl.uploadPublicSound);
-// Tambah route proxy audio
+
+// ✅ Proxy audio (bypass CORS)
 router.get('/proxy-audio', async (req, res) => {
   try {
     const { url } = req.query;
-    if (!url) return res.status(400).json({ message: 'Missing URL' });
-    
+    if (!url) {
+      return res.status(400).json({ message: 'Missing URL parameter' });
+    }
+
+    console.log('🔄 Proxying audio:', url);
+
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; DukunginAudioProxy/1.0)'
       }
     });
-    
-    if (!response.ok) throw new Error('Failed to fetch audio');
-    
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
     const buffer = await response.arrayBuffer();
+    
     res.set({
       'Content-Type': response.headers.get('content-type') || 'audio/mpeg',
+      'Content-Length': buffer.byteLength,
       'Cache-Control': 'public, max-age=3600',
-      'Access-Control-Allow-Origin': '*'
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
     });
+
     res.send(Buffer.from(buffer));
   } catch (err) {
-    res.status(500).json({ message: 'Proxy failed: ' + err.message });
+    console.error('❌ Audio proxy failed:', err.message);
+    res.status(500).json({ 
+      message: 'Failed to proxy audio', 
+      error: err.message 
+    });
   }
 });
+
 
 module.exports = router;

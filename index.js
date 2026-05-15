@@ -6,7 +6,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const connectDB = require('./config/database');
 const { donationQueue, QueueItem } = require('./utils/donationQueue');
-const path = require('path'); // ❌ Missing ini!
+const path = require('path'); 
 
 const app = express();
 const server = http.createServer(app);
@@ -42,7 +42,15 @@ io.on('connection', (socket) => {
 app.use(cors());
 app.use(express.json());
 app.set('socketio', io);
-app.use('/uploads/audio', express.static(path.join(__dirname, 'uploads/audio')));
+app.use('/uploads/audio', express.static(path.join(__dirname, 'uploads/audio'), {
+  maxAge: '1h',
+  setHeaders: (res, path) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cache-Control', 'public, max-age=3600');
+  }
+}));
+
+console.log('✅ Audio uploads served at /uploads/audio');
 
 // Routes
 const overlayRoutes    = require('./routers/overlayRouter');
