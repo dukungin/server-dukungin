@@ -42,6 +42,9 @@ io.on('connection', (socket) => {
 app.use(cors());
 app.use(express.json());
 app.set('socketio', io);
+// app.js - TAMBAH INI
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+app.use('/uploads/audio', express.static(path.join(__dirname, 'public/uploads/audio')));
 app.use('/uploads/audio', express.static(path.join(__dirname, 'uploads/audio'), {
   maxAge: '1h',
   setHeaders: (res, path) => {

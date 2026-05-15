@@ -5,13 +5,32 @@ const overlayCtrl = require('../controllers/overlayController');
 const authMiddleware = require('../middleware/authMiddleware');
 const { audioUpload } = require('../middleware/multerConfig');
 const { proxyAudio } = require('../utils/proxyAudio');
+const upload = require('../middleware/audioUpload');
 
 router.get('/settings',         authMiddleware, overlayCtrl.getSettings);      // ← bukan getOverlaySettings
 router.put('/settings',         authMiddleware, overlayCtrl.updateSettings);   // ← ganti POST ke PUT
 router.get('/public/:username', overlayCtrl.getPublicProfile);
 router.get('/config/:token',    overlayCtrl.getOverlaySettings);
 // ✅ Upload audio publik
-router.post('/upload-audio', authMiddleware, audioUpload.single('audio'), overlayCtrl.uploadPublicSound);
+router.post('/upload-audio', upload.single('audio'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Tidak ada file audio!' });
+    }
+    
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/audio/${req.file.filename}`;
+    
+    res.json({
+      success: true,
+      url: fileUrl,
+      filename: req.file.filename,
+      size: req.file.size
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: 'Upload gagal!' });
+  }
+});
 
 // ✅ Proxy audio (bypass CORS)
 router.get('/proxy-audio', async (req, res) => {
