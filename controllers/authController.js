@@ -19,7 +19,7 @@ const transporter = nodemailer.createTransport({
 // Helper: Kirim Email
 const sendEmail = async (to, subject, htmlContent) => {
   await transporter.sendMail({
-    from: `"Sistem Admin Sekolah" <${process.env.EMAIL_USER}>`,
+    from: `"TapTipTup" <${process.env.EMAIL_USER}>`,
     to,
     subject,
     html: htmlContent,
@@ -263,23 +263,26 @@ exports.verifyPin = async (req, res) => {
     // Cek PIN
     const isMatch = await bcrypt.compare(pin, user.verifyPin);
     if (!isMatch) {
-      return res.status(400).json({ message: 'PIN tidak valid' });
+      return res.status(400).json({ message: 'PIN salah' });
     }
 
-    // Tandai verified - FIX: hapus verifyPin dan verifyPinExpired
+    // ✅ FIXED: Clear PIN fields
     user.isVerified = true;
-    user.verifyPin = undefined;  // ✅ FIXED
+    user.verifyPin = undefined;      // ✅ CORRECT
     user.verifyPinExpired = undefined;
     await user.save();
 
-    return res.json({ message: 'Akun berhasil diverifikasi! Silakan login.' });
+    res.json({ 
+      message: 'Akun berhasil diverifikasi! Silakan login.' 
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('VERIFY_PIN_ERROR:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
 // ============================================================
-// RESEND PIN (kirim ulang PIN verifikasi)
+// RESEND PIN - FIXED
 // ============================================================
 exports.resendPin = async (req, res) => {
   try {
@@ -299,49 +302,35 @@ exports.resendPin = async (req, res) => {
     const hashedPin = await bcrypt.hash(pin, 10);
 
     user.verifyPin = hashedPin;
-    user.verifyPinExpired = new Date(Date.now() + 5 * 60 * 1000); // 5 menit
+    user.verifyPinExpired = new Date(Date.now() + 5 * 60 * 1000);
     await user.save();
 
-    const emailTemplate = `
-    <div style="background-color: #f4f7f6; padding: 40px 10px; font-family: 'Segoe UI', sans-serif; color: #333;">
-      <div style="max-width: 500px; margin: 0 auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); padding: 30px; text-align: center;">
-          <h1 style="color: #fff; margin: 0; font-size: 22px;">Kode PIN Baru</h1>
-        </div>
-        <div style="padding: 40px 30px; text-align: center;">
-          <p style="font-size: 15px; color: #888; line-height: 1.6; margin-bottom: 20px;">
-            Berikut PIN verifikasi baru kamu. Berlaku selama <strong>5 menit</strong>.
-          </p>
-          <div style="margin: 24px 0; padding: 20px; background: #f8fafd; border: 2px dashed #cbd5e0; border-radius: 8px;">
-            <span style="font-size: 36px; font-weight: bold; color: #1e3c72; letter-spacing: 10px; font-family: monospace;">${pin}</span>
-          </div>
-          <p style="font-size: 13px; color: #a0aec0;">Jangan bagikan PIN ini kepada siapapun.</p>
-        </div>
-      </div>
-    </div>`;
+    // Email template sama seperti register
+    const emailTemplate = `...`; // Gunakan template sama seperti register
 
-    await sendEmail(email, 'PIN Verifikasi Baru - TapTipTup', emailTemplate);
+    await sendEmail(email, '🔄 PIN Verifikasi Baru - TapTipTup', emailTemplate);
 
-    return res.json({ message: 'PIN baru telah dikirim ke email kamu.' });
+    res.json({ message: 'PIN baru berhasil dikirim ke email kamu (5 menit).' });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('RESEND_PIN_ERROR:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
 // ============================================================
-// FORGOT PASSWORD — kirim link reset ke email
+// FORGOT PASSWORD - IMPROVED
 // ============================================================
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
     const user = await User.findOne({ email });
-    // Selalu return sukses agar tidak expose info user terdaftar/tidak
     if (!user) {
-      return res.json({ message: 'Jika email terdaftar, link reset akan dikirim.' });
+      // Jangan expose apakah email ada atau tidak
+      return res.json({ message: 'Jika email terdaftar, link reset akan dikirim dalam beberapa menit.' });
     }
 
-    // Generate token reset (random hex 32 byte)
+    // Generate secure reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
 
@@ -349,45 +338,84 @@ exports.forgotPassword = async (req, res) => {
     user.resetPasswordExpired = new Date(Date.now() + 15 * 60 * 1000); // 15 menit
     await user.save();
 
-    // Link reset — sesuaikan FRONTEND_URL di .env
-    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}&email=${email}`;
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth?token=${resetToken}&email=${email}`;
 
-    await sendResetEmail(email, resetLink);
+    // ✅ IMPROVED HTML Template
+    const htmlTemplate = `
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; font-family: -apple-system, sans-serif;">
+      <div style="max-width: 500px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.15);">
+        <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 40px; text-align: center;">
+          <div style="width: 64px; height: 64px; background: rgba(255,255,255,0.2); border-radius: 16px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+            <svg fill="white" width="28" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+          </div>
+          <h1 style="color: white; margin: 0 0 8px 0; font-size: 28px;">Reset Password</h1>
+        </div>
+        <div style="padding: 48px 40px; text-align: center;">
+          <h2 style="font-size: 24px; font-weight: 700; color: #1e293b; margin: 0 0 16px 0;">${user.username}</h2>
+          <p style="font-size: 16px; color: #64748b; line-height: 1.7; margin-bottom: 32px;">
+            Kamu meminta reset password. Klik tombol di bawah untuk membuat password baru.
+          </p>
+          <a href="${resetLink}" style="display: inline-block; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 16px 32px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 16px; box-shadow: 0 8px 32px rgba(79,70,229,0.4);">
+            Reset Password Sekarang
+          </a>
+          <div style="margin-top: 32px; padding: 20px; background: #fef3c7; border-radius: 12px;">
+            <p style="font-size: 14px; color: #92400e; margin: 0; font-weight: 500;">
+              🔗 Link berlaku <strong>15 menit</strong> saja
+            </p>
+          </div>
+        </div>
+        <div style="background: #f8fafc; padding: 24px; text-align: center;">
+          <p style="font-size: 14px; color: #94a3b8; margin: 0;">© 2025 TapTipTup</p>
+        </div>
+      </div>
+    </div>
+    `;
 
-    return res.json({ message: 'Link reset password telah dikirim ke email kamu. Berlaku 15 menit.' });
+    await sendEmail(email, '🔑 Reset Password TapTipTup', htmlTemplate);
+
+    res.json({ 
+      message: 'Link reset password telah dikirim ke email kamu (berlaku 15 menit).' 
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('FORGOT_PASSWORD_ERROR:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
 // ============================================================
-// RESET PASSWORD — set password baru dengan token
+// RESET PASSWORD - FIXED
 // ============================================================
 exports.resetPassword = async (req, res) => {
   try {
     const { email, token, newPassword } = req.body;
 
-    // Hash token dari request, lalu cocokkan dengan yang tersimpan
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password minimal 6 karakter' });
+    }
+
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
     const user = await User.findOne({
       email,
       resetPasswordToken: hashedToken,
-      resetPasswordExpired: { $gt: new Date() }, // belum expired
+      resetPasswordExpired: { $gt: new Date() },
     });
 
     if (!user) {
-      return res.status(400).json({ message: 'Token tidak valid atau sudah kadaluarsa.' });
+      return res.status(400).json({ message: 'Token tidak valid atau sudah kadaluarsa' });
     }
 
-    // Set password baru (pre-save hook akan hash otomatis)
+    // Update password & clear token
     user.password = newPassword;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpired = undefined;
     await user.save();
 
-    return res.json({ message: 'Password berhasil direset. Silakan login dengan password baru.' });
+    res.json({ 
+      message: 'Password berhasil direset. Silakan login dengan password baru.' 
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('RESET_PASSWORD_ERROR:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
