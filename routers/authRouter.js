@@ -4,6 +4,7 @@ const router = express.Router();
 const authCtrl = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
 const uploadImage = require('../middleware/imageUpload');
+const { User } = require('../models');
 
 // ── Auth Dasar ─────────────────────────────────────────────
 router.post('/register',          authCtrl.register);
