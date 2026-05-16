@@ -99,6 +99,11 @@
         type: [Number],
         default: [10000, 25000, 50000, 100000, 250000]
       },
+
+      ttsEnabled: { type: Boolean, default: false },
+      ttsRate: { type: Number, default: 1.0 },      // 0.5 - 2.0
+      ttsPitch: { type: Number, default: 1.0 },     // 0.5 - 2.0
+      ttsVolume: { type: Number, default: 1.0 },
     },
     { timestamps: true }
   );
