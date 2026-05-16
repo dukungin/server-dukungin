@@ -197,27 +197,52 @@ exports.getProfile = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
   try {
-    const { username, email, bio, instagram, facebook, youtube, twitter } = req.body;
+    const allowedFields = [
+      'username',
+      'email',
+      'bio',
+      'donateIntro',      // ← Field yang kita butuhkan
+      'instagram',
+      'facebook',
+      'youtube',
+      'twitter'
+    ];
+
+    const updateData = {};
+
+    allowedFields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
+    // Tambahan validasi username (optional)
+    if (updateData.username) {
+      const existing = await User.findOne({ 
+        username: updateData.username, 
+        _id: { $ne: req.user.id } 
+      });
+      if (existing) {
+        return res.status(400).json({ message: 'Username sudah digunakan' });
+      }
+    }
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { 
-        username, 
-        email, 
-        bio,
-        instagram,
-        facebook,
-        youtube,
-        twitter 
-      },
+      { $set: updateData },
       { new: true, runValidators: true }
     ).select('-password').lean();
+
+    if (!user) {
+      return res.status(404).json({ message: 'User tidak ditemukan' });
+    }
 
     res.json({ 
       message: 'Profil berhasil diupdate', 
       user 
     });
   } catch (err) {
+    console.error('Update Profile Error:', err);
     res.status(400).json({ message: err.message });
   }
 };

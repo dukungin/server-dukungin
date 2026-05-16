@@ -77,6 +77,12 @@ const userSchema = new mongoose.Schema(
     youtube:    { type: String, default: '' },
     twitter:    { type: String, default: '' },   // atau xUsername
     bio: { type: String, default: '' },
+    donateIntro: {
+      type: String,
+      default: 'Support aku biar makin semangat 🚀',
+      trim: true,
+      maxlength: 120
+    },
   },
   { timestamps: true }
 );
