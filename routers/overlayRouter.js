@@ -21,6 +21,21 @@ router.post('/upload-voice', upload.single('voice'), async (req, res) => {
     res.status(500).json({ message: 'Upload gagal' });
   }
 });
+router.post('/upload-profile-picture', authMiddleware, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'Tidak ada file yang diupload' });
+
+    const imageUrl = `${process.env.BASE_URL || 'https://taptiptup.vercel.app'}/uploads/${req.file.filename}`;
+
+    res.json({
+      success: true,
+      url: imageUrl,
+      message: 'Foto profil berhasil diupload'
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Upload gagal', error: err.message });
+  }
+});
 // ✅ Upload audio publik
 // routes/overlay.js - VERCEL SAFE VERSION
 router.post('/upload-audio', upload.single('audio'), (req, res) => {

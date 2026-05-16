@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const authCtrl = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
+const upload = require('../middleware/multerConfig');
 
 // ── Auth Dasar ─────────────────────────────────────────────
 router.post('/register',          authCtrl.register);
@@ -20,5 +21,21 @@ router.post('/reset-password',    authCtrl.resetPassword);
 router.get('/profile',            authMiddleware, authCtrl.getProfile);
 router.put('/profile',            authMiddleware, authCtrl.updateProfile);
 router.put('/change-password',    authMiddleware, authCtrl.changePassword);
+
+router.post('/upload-profile-picture', authMiddleware, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'Tidak ada file yang diupload' });
+
+    const imageUrl = `${process.env.BASE_URL || 'https://taptiptup.vercel.app'}/uploads/${req.file.filename}`;
+
+    res.json({
+      success: true,
+      url: imageUrl,
+      message: 'Foto profil berhasil diupload'
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Upload gagal', error: err.message });
+  }
+});
 
 module.exports = router;
