@@ -147,9 +147,10 @@ exports.start = async (req, res) => {
 
 exports.pause = async (req, res) => {
   try {
+    const { currentSeconds } = req.body; // terima dari client
     const timer = await Subathon.findOneAndUpdate(
       { userId: req.user.id },
-      { $set: { isRunning: false, pausedAt: new Date() } },
+      { $set: { isRunning: false, pausedAt: new Date(), currentSeconds } },
       { new: true }
     );
     _emit(req, req.user.id, 'subathon-updated', timer);
