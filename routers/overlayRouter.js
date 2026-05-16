@@ -11,6 +11,16 @@ router.get('/settings',         authMiddleware, overlayCtrl.getSettings);      /
 router.put('/settings',         authMiddleware, overlayCtrl.updateSettings);   // ← ganti POST ke PUT
 router.get('/public/:username', overlayCtrl.getPublicProfile);
 router.get('/config/:token',    overlayCtrl.getOverlaySettings);
+router.post('/upload-voice', upload.single('voice'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+    const url = req.file?.path || req.file?.location || req.file?.secure_url;
+    res.json({ url });
+  } catch (err) {
+    console.error('[upload-voice]', err);
+    res.status(500).json({ message: 'Upload gagal' });
+  }
+});
 // ✅ Upload audio publik
 // routes/overlay.js - VERCEL SAFE VERSION
 router.post('/upload-audio', upload.single('audio'), (req, res) => {

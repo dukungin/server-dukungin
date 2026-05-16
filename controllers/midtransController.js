@@ -56,7 +56,7 @@
     const {
       amount, donorName, message, userId, email,
       mediaUrl, mediaType, donorUserId, soundUrl,
-      pollVote,   // { pollId, optionId } — opsional, dari /poll/:username
+      pollVote, voiceUrl   // { pollId, optionId } — opsional, dari /poll/:username
     } = req.body;
   
     if (!amount || !userId) {
@@ -122,6 +122,7 @@
         amount:      Math.round(Number(amount)),
         donorName:   donorName || 'Anonim',
         message:     filtered || '',
+        voiceUrl: voiceUrl || null,  // ← TAMBAH INI
         paymentUrl:  snapResponse.redirect_url,
         status:      'PENDING',
         mediaUrl:    mediaUrl || null,
@@ -255,6 +256,7 @@
             donorName: dataDonasi.donorName,
             amount: amount,
             message: dataDonasi.message,
+            voiceUrl: dataDonasi.voiceUrl || null,   // ← TAMBAH INI
             mediaUrl: dataDonasi.mediaUrl || null,
             mediaType: dataDonasi.mediaType || null,
             soundUrl: dataDonasi.soundUrl || overlaySetting?.soundUrl || null, // ← PRIORITAS: donor > default
