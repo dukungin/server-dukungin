@@ -16,7 +16,17 @@ router.post('/webhooks',       midtransCtrl.handleWebhook);
 // ─── Withdrawal (Streamer) ────────────────────────────────────────────────────
 router.post('/withdraw',         authMiddleware, midtransCtrl.requestWithdrawal);
 router.get('/withdraw/history',  authMiddleware, midtransCtrl.getWithdrawalHistory);
+router.post('/mediashare/control', authMiddleware, async (req, res) => {
+  const { action, volume } = req.body;
+  // action: 'skip' | 'volume'
+  const user = await User.findById(req.user.id).lean();
+  if (!user?.overlayToken) return res.status(400).json({ message: 'No overlay token' });
 
+  const io = req.app.get('socketio');
+  io.to(`${user.overlayToken}-mediashare`).emit('mediashare-control', { action, volume });
+
+  res.json({ success: true });
+});
 // ─── Admin ────────────────────────────────────────────────────────────────────
 // GET bisa difilter: ?status=PENDING / COMPLETED / FAILED / (kosong = semua)
 router.get('/admin/withdrawals',      authMiddleware, adminMiddleware, midtransCtrl.adminGetPendingWithdrawals);
