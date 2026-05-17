@@ -1,9 +1,9 @@
-// routers/testAlertRouter.js
-const express    = require('express');
-const router     = express.Router();
-const ctrl       = require('../controllers/testAlertController');
+const express = require('express');
+const router = express.Router();
+const testAlertCtrl = require('../controllers/testAlertController');
 const authMiddleware = require('../middleware/authMiddleware');
 
-router.post('/send', authMiddleware, ctrl.sendInstantTestAlert);
+// Hanya Super Admin yang boleh kirim test alert
+router.post('/send', authMiddleware, testAlertCtrl.sendInstantTestAlert);
 
 module.exports = router;

@@ -1,7 +1,7 @@
-// controllers/testAlertController.js
 const { User, OverlaySetting } = require('../models');
 const { donationQueue } = require('../utils/donationQueue');
 
+// Helper durasi (sama seperti di midtransController)
 const getDisplayDuration = (amount, overlaySetting) => {
   const tiers = overlaySetting?.durationTiers || [];
   if (tiers.length > 0) {
@@ -12,18 +12,19 @@ const getDisplayDuration = (amount, overlaySetting) => {
       }
     }
   }
-  return (overlaySetting?.baseDuration || 8) * 1000;
+  const base = overlaySetting?.baseDuration || 8;
+  return base * 1000;
 };
 
 exports.sendInstantTestAlert = async (req, res) => {
-  const {
-    targetUsername,
-    donorName = 'Test Donor',
-    amount    = 50000,
-    message   = 'Ini adalah test alert dari dashboard!',
-    mediaUrl  = null,
+  const { 
+    targetUsername, 
+    donorName = 'Test Donor', 
+    amount = 50000, 
+    message = 'Ini adalah test alert dari dashboard!', 
+    mediaUrl = null, 
     mediaType = null,
-    voiceUrl  = null,
+    voiceUrl = null,
   } = req.body;
 
   if (!targetUsername) {
@@ -31,52 +32,58 @@ exports.sendInstantTestAlert = async (req, res) => {
   }
 
   try {
+    // Cari streamer berdasarkan username
     const streamer = await User.findOne({ username: targetUsername }).lean();
     if (!streamer) {
       return res.status(404).json({ message: `Streamer @${targetUsername} tidak ditemukan` });
     }
+
     if (!streamer.overlayToken) {
       return res.status(400).json({ message: 'Streamer belum memiliki overlay token' });
     }
 
-    const overlaySetting  = await OverlaySetting.findOne({ userId: streamer._id });
-    const parsedAmount    = Number(amount);
-    const displayDuration = getDisplayDuration(parsedAmount, overlaySetting);
-    const soundUrl        = overlaySetting?.getSoundForAmount
-      ? overlaySetting.getSoundForAmount(parsedAmount)
-      : (overlaySetting?.soundUrl || null);
+    // Ambil setting overlay
+    const overlaySetting = await OverlaySetting.findOne({ userId: streamer._id });
+
+    const displayDuration = getDisplayDuration(Number(amount), overlaySetting);
+
+    const soundUrl = overlaySetting?.soundUrl || null;
 
     const io = req.app.get('socketio');
-    if (!io) return res.status(500).json({ message: 'Socket.IO tidak tersedia' });
-    if (typeof donationQueue?.enqueue !== 'function') {
-      return res.status(500).json({ message: 'Donation queue tidak tersedia' });
+    if (!io) {
+      return res.status(500).json({ message: 'Socket.IO tidak tersedia' });
     }
 
     const payload = {
       donorName,
-      amount:      parsedAmount,
+      amount: Number(amount),
       message,
       mediaUrl,
       mediaType,
-      voiceUrl,
+      receivedAt: new Date().toISOString(),
       soundUrl,
-      receivedAt:   new Date().toISOString(),
-      isTestAlert:  true,
+      isTestAlert: true,
       isGhostAlert: true,
+      voiceUrl,
     };
 
+    // Kirim ke antrian agar konsisten dengan donasi normal
+    if (!donationQueue || typeof donationQueue.enqueue !== 'function') {
+      return res.status(500).json({ message: 'Donation queue tidak tersedia' });
+    }
+    
     donationQueue.enqueue(streamer.overlayToken, payload, io, displayDuration);
 
-    console.log(`[TestAlert] @${req.user?.username} → @${streamer.username} | Rp${parsedAmount}${voiceUrl ? ' [+voice]' : ''}`);
+    console.log(`[Instant Test Alert] Dikirim ke @${streamer.username} | Rp${amount}`);
 
     return res.json({
-      success:         true,
-      message:         `Test alert berhasil dikirim ke @${streamer.username}`,
-      target:          streamer.username,
-      amount:          parsedAmount,
-      displayDuration: Math.round(displayDuration / 1000) + ' detik',
-      hasVoice:        !!voiceUrl,
+      success: true,
+      message: `Test alert berhasil dikirim ke @${streamer.username}`,
+      target: streamer.username,
+      amount: Number(amount),
+      displayDuration: Math.round(displayDuration / 1000) + ' detik'
     });
+
   } catch (err) {
     console.error('[sendInstantTestAlert] Error:', err);
     res.status(500).json({ message: 'Terjadi kesalahan server', error: err.message });
