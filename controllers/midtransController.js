@@ -236,10 +236,12 @@
         // ─── 4. Subathon (non-critical) ────────────────────────────────────────
         try {
           const subathonResult = await subathonCtrl.handleDonationPaid(req, streamer._id, amount); // ✅ req ditambah
-          // if (subathonResult) {
-          //   const io = req.app.get('socketio');
-          //   if (io) io.to(streamer.overlayToken).emit('subathon-updated', subathonResult.timer);
-          // }
+          if (subathonResult) {
+            const io = req.app.get('socketio');
+            if (io) {
+              io.to(streamer.overlayToken).emit('subathon-updated', subathonResult.timer || subathonResult);
+            }
+          }
         } catch (subErr) {
           console.error('[Webhook] Subathon error:', subErr.message);
         }
@@ -266,6 +268,11 @@
             queuePosition: donationQueue.getQueueLength(streamer.overlayToken) + 1,
           };
           donationQueue.enqueue(streamer.overlayToken, payload, io, displayDuration);
+          io.to(streamer.overlayToken).emit('new-donation', {
+            donorName: dataDonasi.donorName,
+            amount: amount,
+            message: dataDonasi.message,
+          });
           console.log(`[Webhook] Donasi "${dataDonasi.donorName}" masuk antrian overlay @${streamer.username}`);
         }
   
