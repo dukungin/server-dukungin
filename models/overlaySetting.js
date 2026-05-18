@@ -146,15 +146,26 @@ overlaySettingSchema.methods.getDuration = function (amount) {
 };
 
 overlaySettingSchema.methods.getAlertDuration = function (amount) {
-  if (!amount || amount <= 0) return 8000;
+  if (!amount || amount <= 0) return 10000;
 
-  // Prioritas 1: Simple Kelipatan
-  if (this.alertDurationPerThousand) {
-    const seconds = Math.ceil(amount / 1000) * this.alertDurationPerThousand;
-    return seconds * 1000; // ke milidetik
+  // ✅ PRIORITAS 1: Gunakan pengaturan baru (Dashboard)
+  if (this.alertBaseDuration != null) {
+    const base = Number(this.alertBaseDuration) || 10;
+    const perAmount = Number(this.alertExtraPerAmount) || 10000;
+    const extraDur = Number(this.alertExtraDuration) || 5;
+
+    const extras = perAmount > 0 ? Math.floor(amount / perAmount) : 0;
+    const totalSeconds = base + (extras * extraDur);
+    
+    return totalSeconds * 1000;
   }
 
-  // Fallback ke tier lama
+  // Fallback lama (jika ada)
+  if (this.alertDurationPerThousand) {
+    const seconds = Math.ceil(amount / 1000) * this.alertDurationPerThousand;
+    return seconds * 1000;
+  }
+
   if (this.durationTiers?.length > 0) {
     const sorted = [...this.durationTiers].sort((a, b) => b.minAmount - a.minAmount);
     for (const tier of sorted) {
@@ -164,18 +175,24 @@ overlaySettingSchema.methods.getAlertDuration = function (amount) {
     }
   }
 
-  return 8000; // default 8 detik
+  return 10000; // default 10 detik
 };
 
 overlaySettingSchema.methods.getMediaShareDuration = function (amount) {
-  if (!amount || amount <= 0) return 12000;
+  if (!amount || amount <= 0) return 15000;
 
-  if (this.mediaShareDurationPerThousand) {
-    const seconds = Math.ceil(amount / 1000) * this.mediaShareDurationPerThousand;
-    return seconds * 1000;
+  // ✅ Gunakan pengaturan baru
+  const base = this.mediaShareBaseDuration ?? 15;
+  const perAmount = this.mediaShareExtraPerAmount ?? 10000;
+  const extraDur = this.mediaShareExtraDuration ?? 10;
+
+  if (perAmount > 0) {
+    const extras = Math.floor(amount / perAmount);
+    const totalSeconds = base + (extras * extraDur);
+    return totalSeconds * 1000;
   }
 
-  return this.getAlertDuration(amount); // fallback
+  return base * 1000;
 };
 
 overlaySettingSchema.methods.getMediaTriggerForAmount = function (amount) {
