@@ -105,6 +105,7 @@ exports.getPublicProfile = async (req, res) => {
       followersCount: user.followersCount || 0,
       followingCount: user.followingCount || 0,
       overlaySetting,
+      feeBearer: overlaySetting?.feeBearer || 'streamer',
       OverlaySetting: overlaySetting, // untuk kompatibilitas lama
       publicSounds: overlaySetting?.publicSounds || [],
     });
