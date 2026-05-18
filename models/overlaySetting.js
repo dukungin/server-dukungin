@@ -105,6 +105,14 @@ const overlaySettingSchema = new mongoose.Schema(
     alertDurationPerThousand:     { type: Number, default: 10 },     // detik per Rp1.000 untuk alert biasa
     mediaShareDurationPerThousand:{ type: Number, default: 15 },    // detik per Rp1.000 untuk Media Share
 
+    alertBaseDuration:          { type: Number, default: 8 },
+    alertExtraPerAmount:        { type: Number, default: 10000 },
+    alertExtraDuration:         { type: Number, default: 5 },
+
+    mediaShareBaseDuration:     { type: Number, default: 12 },
+    mediaShareExtraPerAmount:   { type: Number, default: 10000 },
+    mediaShareExtraDuration:    { type: Number, default: 8 },
+
     // (opsional) tetap boleh pakai tier kalau mau advanced
     durationTiers: { type: [durationTierSchema], default: [] },
 
