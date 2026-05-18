@@ -276,7 +276,17 @@
           : (overlaySetting?.soundUrl || null);
 
         const displayDuration = getDisplayDuration(nominalInput, overlaySetting);
-
+        // ─── Voice Note Overlay — emit DULU sebelum enqueue ─────────
+        if (dataDonasi.voiceUrl && io && streamer.overlayToken) {
+          io.to(`${streamer.overlayToken}-voice`).emit('new-voice-donation', {
+            donorName:  dataDonasi.donorName,
+            amount:     nominalInput,
+            message:    dataDonasi.message,
+            voiceUrl:   dataDonasi.voiceUrl,
+            receivedAt: new Date().toISOString(),
+          });
+          console.log(`[VoiceOverlay] Emitted ke room ${streamer.overlayToken}-voice`);
+        }
         const io = req.app.get('socketio');
         if (io && streamer.overlayToken) {
           const payload = {
