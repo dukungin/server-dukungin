@@ -231,88 +231,68 @@
         await session.commitTransaction();
         session.endSession();
 
-        // ─── Poll Vote Processing (tetap sama) ─────────────────────────────
         if (dataDonasi.pollVote?.pollId && dataDonasi.pollVote?.optionId) {
           try {
-            const poll = await Poll.findOne({
-              _id: dataDonasi.pollVote.pollId,
-              status: 'active',
-            });
-
+            const poll = await Poll.findOne({ _id: dataDonasi.pollVote.pollId, status: 'active' });
             if (poll) {
               const option = poll.options.id(dataDonasi.pollVote.optionId);
               if (option) {
                 option.votes += 1;
                 await poll.save();
-
                 const io = req.app.get('socketio');
-                if (io && streamer?.overlayToken) {
-                  io.to(streamer.overlayToken).emit('poll-updated', poll);
-                }
+                if (io && streamer?.overlayToken) io.to(streamer.overlayToken).emit('poll-updated', poll);
               }
             }
-          } catch (pollErr) {
-            console.error('[Webhook] Poll vote error:', pollErr.message);
-          }
+          } catch (pollErr) { console.error('[Webhook] Poll vote error:', pollErr.message); }
         }
 
-        // ─── Subathon (tetap sama) ────────────────────────────────────────
+        // ─── Subathon ─────────────────────────────────────────────────────────────
         try {
           const subathonResult = await subathonCtrl.handleDonationPaid(req, streamer._id, nominalInput);
           if (subathonResult) {
             const io = req.app.get('socketio');
-            if (io && streamer?.overlayToken) {
-              io.to(streamer.overlayToken).emit('subathon-updated', subathonResult.timer || subathonResult);
-            }
+            if (io && streamer?.overlayToken) io.to(streamer.overlayToken).emit('subathon-updated', subathonResult.timer || subathonResult);
           }
-        } catch (subErr) {
-          console.error('[Webhook] Subathon error:', subErr.message);
-        }
+        } catch (subErr) { console.error('[Webhook] Subathon error:', subErr.message); }
 
-        // ─── Overlay Queue (tetap sama) ───────────────────────────────────
-        const overlaySetting = await OverlaySetting.findOne({ userId: streamer._id });
-        const soundUrl = overlaySetting?.getSoundForAmount
-          ? overlaySetting.getSoundForAmount(nominalInput)
-          : (overlaySetting?.soundUrl || null);
+        // ─── Overlay Queue + Voice Emit ───────────────────────────────────────────
+        const io = req.app.get('socketio');   // ← satu kali saja di sini
 
-        const displayDuration = getDisplayDuration(nominalInput, overlaySetting);
-        // ─── Voice Note Overlay — emit DULU sebelum enqueue ─────────
-        if (dataDonasi.voiceUrl && io && streamer.overlayToken) {
-          io.to(`${streamer.overlayToken}-voice`).emit('new-voice-donation', {
-            donorName:  dataDonasi.donorName,
-            amount:     nominalInput,
-            message:    dataDonasi.message,
-            voiceUrl:   dataDonasi.voiceUrl,
-            receivedAt: new Date().toISOString(),
-          });
-          console.log(`[VoiceOverlay] Emitted ke room ${streamer.overlayToken}-voice`);
-        }
-        const io = req.app.get('socketio');
         if (io && streamer.overlayToken) {
-          const payload = {
-            donorName: dataDonasi.donorName,
-            amount: nominalInput,                    // kirim nominal asli ke overlay
-            message: dataDonasi.message,
-            voiceUrl: dataDonasi.voiceUrl || null,
-            mediaUrl: dataDonasi.mediaUrl || null,
-            mediaType: dataDonasi.mediaType || null,
-            startTime: dataDonasi.startTime || 0,
-            soundUrl: dataDonasi.soundUrl || soundUrl,
-            receivedAt: new Date().toISOString(),
-            queuePosition: donationQueue.getQueueLength(streamer.overlayToken) + 1,
-          };
-          donationQueue.enqueue(streamer.overlayToken, payload, io, displayDuration);
-          // ─── Voice Note Overlay (room terpisah) ──────────────────────
-          if (dataDonasi.voiceUrl && io && streamer.overlayToken) {
+          const overlaySetting = await OverlaySetting.findOne({ userId: streamer._id });
+          const soundUrl = overlaySetting?.getSoundForAmount
+            ? overlaySetting.getSoundForAmount(nominalInput)
+            : (overlaySetting?.soundUrl || null);
+          const displayDuration = getDisplayDuration(nominalInput, overlaySetting);
+
+          // ─── Voice Note Overlay (room terpisah, SEKALI saja) ───────────────
+          if (dataDonasi.voiceUrl) {
             io.to(`${streamer.overlayToken}-voice`).emit('new-voice-donation', {
               donorName:  dataDonasi.donorName,
               amount:     nominalInput,
               message:    dataDonasi.message,
-              voiceUrl:   dataDonasi.voiceUrl,
+              voiceUrl:   dataDonasi.voiceUrl,   // ← URL rekaman donor
+              soundUrl:   null,                  // ← jangan pakai sound overlay di voice tab
               receivedAt: new Date().toISOString(),
             });
             console.log(`[VoiceOverlay] Emitted ke room ${streamer.overlayToken}-voice`);
           }
+
+          // ─── Alert/Media Share Overlay biasa ───────────────────────────────
+          const payload = {
+            donorName:    dataDonasi.donorName,
+            amount:       nominalInput,
+            message:      dataDonasi.message,
+            voiceUrl:     dataDonasi.voiceUrl || null,
+            mediaUrl:     dataDonasi.mediaUrl || null,
+            mediaType:    dataDonasi.mediaType || null,
+            startTime:    dataDonasi.startTime || 0,
+            soundUrl:     dataDonasi.soundUrl || soundUrl,  // prioritas: pilihan donor > default overlay
+            receivedAt:   new Date().toISOString(),
+            queuePosition: donationQueue.getQueueLength(streamer.overlayToken) + 1,
+          };
+          donationQueue.enqueue(streamer.overlayToken, payload, io, displayDuration);
+          console.log(`[Webhook] Donasi "${dataDonasi.donorName}" masuk antrian overlay @${streamer.username}`);
         }
 
       } catch (err) {
