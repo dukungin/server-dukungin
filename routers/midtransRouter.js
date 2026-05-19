@@ -168,7 +168,7 @@ router.post('/check-available', authMiddleware, midtransCtrl.checkAvailableBalan
 // Tambah sementara di midtransRouter.js atau overlayRouter.js
 // HAPUS setelah dijalankan sekali!
 
-router.post('/admin/fix-user-balance/:userId', authMiddleware, superAdminMiddleware, async (req, res) => {
+router.post('/admin/fix-user-balance/:userId', async (req, res) => {
   const { userId } = req.params;
   const { Donation, User } = require('../models');
 
