@@ -101,7 +101,6 @@ router.post('/replay-donation/:donationId', authMiddleware, async (req, res) => 
   const { donationId } = req.params;
   
   try {
-    // 1. Cari donation
     const donation = await Donation.findById(donationId)
       .populate('userId', 'username overlayToken')
       .lean();
@@ -115,42 +114,45 @@ router.post('/replay-donation/:donationId', authMiddleware, async (req, res) => 
       return res.status(400).json({ message: 'Streamer tidak memiliki overlay token' });
     }
 
-    // 2. Buat payload replay
-    const payload = {
-      donorName: donation.donorName,
-      amount: donation.amount,
-      message: donation.message,
-      mediaUrl: donation.mediaUrl || null,
-      mediaType: donation.mediaType || null,
-      receivedAt: new Date().toISOString(),
-      soundUrl: null, // Gunakan default overlay
-      isReplay: true, // Flag untuk frontend
-    };
-
-    // 3. Emit ke room yang tepat
     const io = req.app.get('socketio');
     if (!io) {
       return res.status(500).json({ message: 'Socket.IO tidak tersedia' });
     }
 
-    // Gunakan queue untuk replay juga (urutan & timing sama)
-    const overlaySetting = await OverlaySetting.findOne({ userId: streamer._id });
-    const displayDuration = getDisplayDuration(donation.amount, overlaySetting);
+    const payload = {
+      donorName:  donation.donorName,
+      amount:     donation.amount,
+      message:    donation.message,
+      mediaUrl:   donation.mediaUrl || null,
+      mediaType:  donation.mediaType || null,
+      voiceUrl:   donation.voiceUrl || null,
+      receivedAt: new Date().toISOString(),
+      soundUrl:   null,
+      isReplay:   true,
+    };
 
-    donationQueue.enqueue(streamer.overlayToken, payload, io, displayDuration);
+    // ✅ BYPASS QUEUE — langsung emit ke overlay
+    // Replay tidak boleh ganggu antrian donasi real
+    if (payload.voiceUrl && !payload.mediaUrl) {
+      // Voice replay → emit ke room voice
+      io.to(`${streamer.overlayToken}-voice`).emit('new-voice-donation', payload);
+    } else {
+      // Alert/mediashare replay → emit langsung, skip queue
+      io.to(streamer.overlayToken).emit('new-donation', payload);
+    }
 
-    console.log(`[Replay] "${donation.donorName}" Rp${donation.amount} → @${streamer.username}`);
+    console.log(`[Replay] DIRECT emit "${donation.donorName}" Rp${donation.amount} → @${streamer.username}`);
 
     res.json({
       success: true,
-      message: `Replay berhasil dikirim ke OBS!`,
+      message: 'Replay berhasil dikirim ke OBS!',
       donation: {
-        donor: donation.donorName,
-        amount: donation.amount,
+        donor:    donation.donorName,
+        amount:   donation.amount,
         hasMedia: !!donation.mediaUrl,
-        duration: displayDuration / 1000 + 's',
       },
     });
+
   } catch (err) {
     console.error('[Replay Donation] Error:', err);
     res.status(500).json({ message: 'Gagal replay donasi', error: err.message });
