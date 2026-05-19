@@ -1,4 +1,3 @@
-// config/whatsapp.js - FIXED QR DISPLAY
 const { 
   makeWASocket, 
   useMultiFileAuthState, 
@@ -6,16 +5,16 @@ const {
   delay 
 } = require('baileys');
 const fs = require('fs');
-const path = require('path');
+const QRCode = require('qrcode');
 
 let sock = null;
 let isReady = false;
-let qrCode = null;
+let qrCodeUrl = null;
 
 const sendTracker = { date: null, count: 0, MAX_PER_DAY: 50 };
 
 const initWhatsApp = async () => {
-  console.log('[WA] Starting Baileys with QR...');
+  console.log('[WA] Starting Baileys...');
   
   if (sock && isReady) {
     console.log('[WA] Already connected!');
@@ -41,44 +40,45 @@ const initWhatsApp = async () => {
 
     sock.ev.on('creds.update', saveCreds);
 
-    sock.ev.on('connection.update', (update) => {
+    sock.ev.on('connection.update', async (update) => {
       const { connection, qr } = update;
       
-      console.log('[WA] Conn:', connection);
-      
-      // ✅ PRINT QR CODE!
       if (qr) {
-        qrCode = qr;
-        console.log('\n========================================');
-        console.log('📱 QR CODE (scan dalam 30 detik):');
-        console.log('========================================');
-        console.log(qr);  // ⬅️ PRINT HERE!
-        console.log('========================================');
-        console.log('📱 Atau buka WhatsApp → Settings → Linked Devices\n');
+        qrCodeUrl = 'https://wa.me/settings/linked_devices#' + qr;
+        
+        // ✅ GENERATE QR IMAGE!
+        try {
+          const qrImage = await QRCode.toDataURL(qrCodeUrl, {
+            width: 300,
+            margin: 2,
+            color: { dark: '#000000', light: '#FFFFFF' }
+          });
+          
+          console.log('\n========================================');
+          console.log('📱 SCAN QR INI DENGAN WHATSAPP HP:');
+          console.log('========================================\n');
+          console.log(qrImage);  // ⬅️ QR Image Base64
+          console.log('\n📱 Atau link: https://wa.me/settings/linked_devices');
+          console.log('========================================\n');
+        } catch (e) {
+          console.log('\n📱 Link to open:');
+          console.log(qrCodeUrl);
+        }
       }
       
       if (connection === 'open') {
         isReady = true;
-        qrCode = null;
+        qrCodeUrl = null;
         console.log('\n✅✅ WhatsApp TERHUBUNG! ✅✅\n');
       }
     });
-
-    console.log('[WA] Waiting 15s...');
-    for (let i = 0; i < 15; i++) {
-      await delay(1000);
-    }
-
-    if (!state.creds?.me?.id && !isReady) {
-      console.log('[WA] Asking for QR...');
-    }
 
     console.log('[WA] Waiting for connection...');
     for (let i = 0; i < 120; i++) {
       await delay(1000);
       
-      if (qrCode) {
-        console.log(`[WA] still waiting... ${i}s - QR ready! Scan now!`);
+      if (qrCodeUrl) {
+        console.log(`[WA] Waiting... ${i}s - QR ready!`);
       }
       if (isReady) {
         console.log('[WA] ✅ Connected!', i, 's');
@@ -98,7 +98,7 @@ const initWhatsApp = async () => {
   }
 };
 
-// Exports
+// Exports (sama)
 const canSendMessage = () => {
   const today = new Date().toISOString().split('T')[0];
   if (sendTracker.date !== today) {
@@ -118,7 +118,7 @@ const getSendStats = () => ({
 
 const getClient = () => sock;
 const getIsReady = () => isReady;
-const getQRCode = () => qrCode;
+const getQRCode = () => qrCodeUrl;
 
 const waitUntilReady = (ms = 120000) => new Promise((resolve, reject) => {
   if (isReady) return resolve(true);
