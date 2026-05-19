@@ -7,24 +7,42 @@ require('dotenv').config();
 // ============================================================
 exports.getSettings = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id)
+    const userId = req.user.id;
+ 
+    const user = await User.findById(userId)
       .select('-password')
       .lean();
-
+ 
     if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
-
-    const overlaySetting = await OverlaySetting.findOne({ userId: user._id }).lean();
-
+ 
+    const overlaySetting = await OverlaySetting.findOne({ userId }).lean();
+ 
+    // ── Hitung saldo ──────────────────────────────────────────
+    const walletBalance    = parseFloat(user.walletBalance    || 0);
+    const availableBalance = parseFloat(user.availableBalance || 0);
+    // pendingBalance = total donasi yang belum genap 1 hari
+    const pendingBalance   = Math.max(0, walletBalance - availableBalance);
+ 
     res.json({
-      user,
-      User: user,
-      overlaySetting,
-      settings: overlaySetting,
-      walletBalance: user.walletBalance,
-      availableBalance: user.availableBalance,  // ⬅️ TAMBAHKAN INI
+      // Expose di level atas agar mudah diakses frontend
+      walletBalance,
+      availableBalance,
+      pendingBalance,
+ 
+      // Tetap kirim User object untuk kompatibilitas
+      User: {
+        ...user,
+        walletBalance,
+        availableBalance,
+        pendingBalance,
+      },
+ 
+      settings: overlaySetting || {},
+      overlaySetting: overlaySetting || {},
     });
   } catch (err) {
-    res.status(500).json({ message: 'Server Error', error: err.message });
+    console.error('[getSettings] Error:', err);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 

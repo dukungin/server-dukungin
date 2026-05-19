@@ -1,12 +1,11 @@
-
-// models/donation.js
+// models/donation.js — VERSI FINAL
 const mongoose = require('mongoose');
 
 const donationSchema = new mongoose.Schema(
   {
     externalId: {
       type: String,
-      unique: true, // order_id dari Midtrans
+      unique: true,
       required: true,
     },
     userId: {
@@ -14,7 +13,11 @@ const donationSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
-    donorUserId:{ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    donorUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
     donorName: {
       type: String,
       default: 'Anonim',
@@ -32,25 +35,44 @@ const donationSchema = new mongoose.Schema(
       enum: ['PENDING', 'PAID', 'EXPIRED'],
       default: 'PENDING',
     },
-    // Field baru: kapan donasi ini available untuk ditarik
-    availableAt: { type: Date, default: null },  // ⬅️ PASTIKAN ADA
+
+    // ── Fee tracking ──────────────────────────────────────────
+    grossAmount:     { type: Number, default: null },
+    streamerReceive: { type: Number, default: null }, // amount setelah 2.5% dipotong
+    feeBearer:       { type: String, enum: ['streamer', 'donor'], default: null },
+    percentFee:      { type: Number, default: null },
+
+    // ── Available balance tracking ────────────────────────────
+    // availableAt: kapan donasi ini bisa ditarik (createdAt + 24 jam)
+    // diset oleh webhook saat donasi PAID
+    availableAt: { type: Date, default: null },
+
+    // isAvailable: apakah sudah masuk ke availableBalance user
+    // diset true oleh cron setelah availableAt terlewati
+    isAvailable: { type: Boolean, default: false },
+
+    // ── Media & misc ──────────────────────────────────────────
     startTime: { type: Number, default: 0 },
-    voiceUrl: { type: String, default: null },
+    voiceUrl:  { type: String, default: null },
     mediaUrl:  { type: String, default: null },
-    mediaType: { type: String, enum: ['image', 'video', 'youtube'], default: 'image' },
-    grossAmount: { type: Number },
-    streamerReceive: { type: Number },
-    feeBearer: { type: String, enum: ['streamer', 'donor'] },
-    percentFee: { type: Number },
-    paymentUrl: String, // Snap redirect_url
+    mediaType: { type: String, enum: ['image', 'video', 'youtube', null], default: null },
+    soundUrl:  { type: String, default: null },
+    paymentUrl: String,
+
+    pollVote: {
+      pollId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Poll', default: null },
+      optionId: { type: String, default: null },
+    },
   },
   { timestamps: true }
 );
 
+// Indexes
 donationSchema.index({ userId: 1, createdAt: -1 });
 donationSchema.index({ donorUserId: 1, createdAt: -1 });
 donationSchema.index({ status: 1 });
 donationSchema.index({ donorUserId: 1, userId: 1 });
-donationSchema.index({ streamerUsername: 1, status: 1 });
+// Index penting untuk cron
+donationSchema.index({ status: 1, isAvailable: 1, availableAt: 1 });
 
 module.exports = mongoose.model('Donation', donationSchema);

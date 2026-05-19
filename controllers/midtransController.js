@@ -142,6 +142,9 @@
         voiceUrl: voiceUrl || null,  // ← TAMBAH INI
         paymentUrl:  snapResponse.redirect_url,
         status:      'PENDING',
+        streamerReceive: streamerWillReceive,  // ← TAMBAH INI
+        feeBearer,                             // ← TAMBAH INI
+        percentFee:      percentFee, 
         mediaUrl:    mediaUrl || null,
         mediaType:   mediaType || null,
         startTime: req.body.startTime || 0,  
@@ -206,7 +209,6 @@
 
         const milestones = ['10k', '50k', '100k', '500k', '1jt'];
         const milestoneUpdates = {};
-
         for (const milestone of milestones) {
           const milestoneAmount = parseInt(milestone.replace('k', '000').replace('jt', '000000'));
           if (nominalInput >= milestoneAmount) {
@@ -226,15 +228,27 @@
           { session }
         );
 
-        // Langsung update walletBalance tapi availableBalance belum dihitung
-        // Nanti ada job/cron yang update availableBalance setelah 1 hari
+        // Tandai donasi belum available, set kapan bisa available
+        await Donation.findByIdAndUpdate(
+          dataDonasi._id,
+          {
+            $set: {
+              availableAt:  availableAt,
+              isAvailable:  false,          // belum bisa ditarik
+              streamerReceive: streamerReceive, // simpan untuk cron pakai ini
+            }
+          },
+          { session }
+        );
+
         await User.findByIdAndUpdate(
           streamer._id,
           {
-            $inc: { 
-              walletBalance: streamerReceive,
-              totalDonations: nominalInput,
-              totalDonationCount: 1 
+            $inc: {
+              walletBalance:      streamerReceive,  // total saldo (termasuk yang pending)
+              totalDonations:     nominalInput,
+              totalDonationCount: 1,
+              // ❌ JANGAN tambahkan availableBalance di sini
             },
             $set: milestoneUpdates,
           },
@@ -415,59 +429,35 @@ exports.getAvailableBalance = async (req, res) => {
   exports.requestWithdrawal = async (req, res) => {
     const { amount, paymentMethod, channelCode, accountNumber, accountName } = req.body;
     const userId = req.user.id;
-
+  
     const amt = parseFloat(amount);
-
+  
     if (!amount || isNaN(amt) || amt <= 0)
       return res.status(400).json({ message: 'Nominal tidak valid' });
-    if (amt < 10000)
-      return res.status(400).json({ message: 'Minimal penarikan adalah Rp 10.000' });
+    if (amt < 20000)
+      return res.status(400).json({ message: 'Minimal penarikan adalah Rp 20.000' });
     if (amt > 10000000)
       return res.status(400).json({ message: 'Maksimal penarikan adalah Rp 10.000.000' });
     if (!channelCode || !accountNumber || !accountName)
       return res.status(400).json({ message: 'Data rekening tidak lengkap' });
-
-    // HAPUS ADMIN_FEE - hanya 2.5% yang dipotong saat donasi masuk
-    // Saat withdraw, JUMLAH YANG DIMINTA adalah yang diambil
+  
     const referenceNo = `wd-${userId}-${Date.now()}`;
-
-    const session = await mongoose.startSession();
+    const session     = await mongoose.startSession();
     session.startTransaction();
-
+  
     try {
-      // 1. CEK SALDO AVAILABLE (yang sudah lebih dari 1 hari)
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      
-      const availableDonations = await Donation.aggregate([
-        {
-          $match: {
-            userId: new mongoose.Types.ObjectId(userId),
-            status: 'PAID',
-            isAvailable: true  // Hanya yang sudah available
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: '$streamerReceive' }
-          }
-        }
-      ]);
-
-      const availableBalance = availableDonations[0]?.total || 0;
-
-      // Alternatif: cek dari wallet availableBalance field
-      // const user = await User.findById(userId);
-      // const availableBalance = user.availableBalance || 0;
-
-      if (availableBalance < 10000) {
+      // 1. Ambil availableBalance user saat ini
+      const user = await User.findById(userId).session(session);
+      const availableBalance = parseFloat(user?.availableBalance || 0);
+  
+      if (availableBalance < 20000) {
         await session.abortTransaction();
         session.endSession();
         return res.status(400).json({
-          message: `Saldo tersedia minimal Rp 10.000. Saat ini: Rp ${availableBalance.toLocaleString('id-ID')}`,
+          message: `Saldo tersedia minimal Rp 20.000. Saldo tersedia: Rp ${availableBalance.toLocaleString('id-ID')}`,
         });
       }
-
+  
       if (amt > availableBalance) {
         await session.abortTransaction();
         session.endSession();
@@ -475,18 +465,21 @@ exports.getAvailableBalance = async (req, res) => {
           message: `Saldo tidak cukup. Saldo tersedia: Rp ${availableBalance.toLocaleString('id-ID')}`,
         });
       }
-
-      // 2. POTONG availableBalance & CREATE WITHDRAWAL (TIDAK ADA FEE SAAT WITHDRAW)
-      // Tidak ada admin fee yang dipotong!
-      
-      // Update availableBalance - kurangi
-      await User.findByIdAndUpdate(
-        userId,
-        { $inc: { availableBalance: -amt } },
-        { session }
+  
+      // 2. Potong availableBalance dan walletBalance (keduanya harus berkurang)
+      // Tidak ada fee tambahan — 2.5% sudah dipotong saat donasi masuk
+      await User.findOneAndUpdate(
+        { _id: userId, availableBalance: { $gte: amt } },
+        {
+          $inc: {
+            availableBalance: -amt,
+            walletBalance:    -amt,
+          }
+        },
+        { new: true, session }
       );
-
-      // Create withdrawal record
+  
+      // 3. Buat record withdrawal
       await Withdrawal.create([{
         userId,
         amount: amt,
@@ -498,17 +491,17 @@ exports.getAvailableBalance = async (req, res) => {
         midtransReference: referenceNo,
         note: null,
       }], { session });
-
+  
       await session.commitTransaction();
       session.endSession();
-
+  
       res.json({
         message: '✅ Penarikan berhasil diajukan!',
         referenceNo,
         status: 'PENDING',
         detail: `Rp ${amt.toLocaleString('id-ID')} → ${channelCode} ${accountNumber}`,
       });
-
+  
     } catch (err) {
       if (session.inTransaction()) await session.abortTransaction();
       session.endSession();
