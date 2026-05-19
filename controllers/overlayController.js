@@ -20,6 +20,8 @@ exports.getSettings = async (req, res) => {
       User: user,
       overlaySetting,
       settings: overlaySetting,
+      walletBalance: user.walletBalance,
+      availableBalance: user.availableBalance,  // ⬅️ TAMBAHKAN INI
     });
   } catch (err) {
     res.status(500).json({ message: 'Server Error', error: err.message });
