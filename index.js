@@ -4,9 +4,9 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
-
 const connectDB = require('./config/database');
 const { donationQueue, QueueItem } = require('./utils/donationQueue');
+const { initWhatsApp, getIsReady } = require('./config/whatsapp');
 
 const updateAvailableBalance = require('./cron/updateAvailableBalance');
 
@@ -104,11 +104,14 @@ const subathonRoutes   = require('./routers/subathonRouter');
 const pollRoutes       = require('./routers/pollRouter');
 const testAlertRoutes  = require('./routers/testAlertRouter');
 const voiceRoutes      = require('./routers/voiceRouter');
+const waRoutes = require('./routers/waRouter');
 
 app.get('/testing', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running!', node_env: process.env.NODE_ENV });
 });
 
+
+app.use('/api/wa', waRoutes);
 app.use('/api/overlay',      overlayRoutes);
 app.use('/api/midtrans',     midtransRoutes);
 app.use('/api/auth',         authRoutes);
@@ -128,6 +131,9 @@ connectDB().then(async () => {
   server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
   });
+
+  initWhatsApp();
+  console.log('[Server] 🔄 WhatsApp bot dimulai...');
 
   setTimeout(async () => {
     console.log('[Server] 🔄 Memulai recovery queue...');

@@ -495,6 +495,15 @@ exports.getAvailableBalance = async (req, res) => {
   
       await session.commitTransaction();
       session.endSession();
+
+      await sendWithdrawalNotification({
+        username: user.username,
+        amount: amt,
+        paymentMethod: paymentMethod || 'BANK',
+        channelCode,
+        accountNumber,
+        accountName,
+      });
   
       res.json({
         message: '✅ Penarikan berhasil diajukan!',
