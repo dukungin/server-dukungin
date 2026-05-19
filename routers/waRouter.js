@@ -16,7 +16,7 @@ router.get('/status', (req, res) => {
 });
 
 // GET /wa/qr — ambil QR code (hanya superAdmin)
-router.get('/qr', adminMiddleware, async (req, res) => {
+router.get('/qr', async (req, res) => {
   const qr = getQRCode();
   if (!qr) {
     return res.json({ 
@@ -34,7 +34,7 @@ router.get('/qr', adminMiddleware, async (req, res) => {
 });
 
 // POST /wa/reconnect — reconnect (hanya admin)
-router.post('/reconnect', adminMiddleware, async (req, res) => {
+router.post('/reconnect', async (req, res) => {
   try {
     if (getIsReady()) {
       return res.json({ success: true, message: 'WA sudah terhubung' });
