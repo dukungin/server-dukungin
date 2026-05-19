@@ -1,7 +1,7 @@
-// config/telegram.js
+// config/telegram.js - UPDATE TOKEN
 const TelegramBot = require('node-telegram-bot-api');
 
-const TOKEN = '8812242847:AAHzFUf_gkBa2Xtu1t3ZJOi_EhV0zkOh1xc';
+const TOKEN = '8868652249:AAF5tSvIIw728jcaroZ0WEWmEAsA7Nd_7v0';
 const ADMIN_CHAT_ID = '1197980788';
 
 let bot = null;
@@ -12,10 +12,11 @@ const initTelegram = () => {
     bot = new TelegramBot(TOKEN, { polling: false });
     isReady = true;
     console.log('[TG] ✅ Telegram Bot ready!');
-    console.log('[TG] Chat ID:', ADMIN_CHAT_ID);
     
     // Send welcome message
-    bot.sendMessage(ADMIN_CHAT_ID, '🎉 Bot Telegram Dukungin aktif!').catch(() => {});
+    setTimeout(() => {
+      bot.sendMessage(ADMIN_CHAT_ID, '🎉 Dukungin Bot Aktif!').catch(() => {});
+    }, 3000);
   } catch (e) {
     console.log('[TG] Error:', e.message);
     isReady = false;
@@ -23,10 +24,7 @@ const initTelegram = () => {
 };
 
 const sendNotification = async (message) => {
-  if (!bot || !isReady) {
-    console.log('[TG] Bot not ready');
-    return false;
-  }
+  if (!bot || !isReady) return false;
   try {
     await bot.sendMessage(ADMIN_CHAT_ID, message, { parse_mode: 'Markdown' });
     return true;
