@@ -8,6 +8,7 @@ const superAdminMiddleware = require('../middleware/superAdminMiddleware');
 const { User, OverlaySetting, Donation } = require('../models');
 const { donationQueue } = require('../utils/donationQueue');
 const { getDisplayDuration } = require('../utils/helpers');
+const { default: mongoose } = require('mongoose');
 
 // ─── Donasi ───────────────────────────────────────────────────────────────────
 router.post('/create-invoice', midtransCtrl.createDonation);
@@ -166,6 +167,55 @@ router.post('/check-available', authMiddleware, midtransCtrl.checkAvailableBalan
 
 // Tambah sementara di midtransRouter.js atau overlayRouter.js
 // HAPUS setelah dijalankan sekali!
+
+router.post('/admin/fix-user-balance/:userId', authMiddleware, superAdminMiddleware, async (req, res) => {
+  const { userId } = req.params;
+  const { Donation, User } = require('../models');
+
+  // Hitung ulang availableBalance dari donasi isAvailable = true
+  const result = await Donation.aggregate([
+    {
+      $match: {
+        userId: new mongoose.Types.ObjectId(userId),
+        status: 'PAID',
+        isAvailable: true,
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        total: {
+          $sum: {
+            $cond: [
+              { $gt: ['$streamerReceive', 0] },
+              '$streamerReceive',
+              '$amount'
+            ]
+          }
+        }
+      }
+    }
+  ]);
+
+  const correctAvailable = result[0]?.total || 0;
+  const user = await User.findById(userId);
+
+  // Pastikan tidak melebihi walletBalance
+  const finalAvailable = Math.min(correctAvailable, user.walletBalance);
+
+  await User.findByIdAndUpdate(userId, {
+    $set: { availableBalance: finalAvailable }
+  });
+
+  res.json({
+    userId,
+    walletBalance:        user.walletBalance,
+    computedAvailable:    correctAvailable,
+    finalAvailableSet:    finalAvailable,
+    pendingBalance:       user.walletBalance - finalAvailable,
+  });
+});
+
 
 // router.post('/admin/migrate-balance', async (req, res) => {
 //   try {
