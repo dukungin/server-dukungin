@@ -1,9 +1,7 @@
-// config/whatsapp.js - VERSI PAIRING CODE
 const { 
   makeWASocket, 
   useMultiFileAuthState, 
-  fetchLatestBaileysVersion,
-  proto 
+  fetchLatestBaileysVersion 
 } = require('baileys');
 const fs = require('fs');
 const path = require('path');
@@ -13,6 +11,15 @@ let isReady = false;
 let pairingCode = null;
 
 const sendTracker = { date: null, count: 0, MAX_PER_DAY: 50 };
+
+// ✅ BUAT LOGGER SEDERHANA
+const logger = {
+  info: (...args) => console.log('[WA INFO]', ...args),
+  error: (...args) => console.error('[WA ERROR]', ...args),
+  warn: (...args) => console.warn('[WA WARN]', ...args),
+  debug: (...args) => console.log('[WA DEBUG]', ...args),
+  child: () => logger,  // ⬅️ FIX DI SINI
+};
 
 const initWhatsApp = async () => {
   console.log('[WA] Starting Baileys with Pairing Code...');
@@ -31,19 +38,18 @@ const initWhatsApp = async () => {
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
     const { version } = await fetchLatestBaileysVersion();
 
+    // ✅ TANPA OPTION LOGGER!
     sock = makeWASocket({
       version,
       auth: state,
-      print: (msg) => console.log('[WA]', msg),
-      logger: console,
+      // ✌️ Hapus: logger: console,
       browser: ['Dukungin Server', 'Chrome', '120'],
     });
 
     sock.ev.on('creds.update', saveCreds);
 
-    // ✅ PAIRING CODE HANDLER
     sock.ev.on('connection.update', async (update) => {
-      const { connection, code, qr } = update;
+      const { connection, code } = update;
       
       if (code) {
         console.log('\n🎯 PAIRING CODE:', code);
@@ -62,7 +68,7 @@ const initWhatsApp = async () => {
       }
     });
 
-    // ✅ TUNGGU SAMPAI TERHUBUNG
+    // Wait for connection (max 2 menit)
     let attempts = 0;
     while (!isReady && attempts < 120) {
       await new Promise(r => setTimeout(r, 1000));
@@ -82,11 +88,11 @@ const initWhatsApp = async () => {
     
   } catch (err) {
     console.error('[WA] Error:', err.message);
+    console.error('[WA] Stack:', err.stack);
     return null;
   }
 };
 
-// Functions
 const canSendMessage = () => {
   const today = new Date().toISOString().split('T')[0];
   if (sendTracker.date !== today) {
@@ -106,7 +112,7 @@ const getSendStats = () => ({
 
 const getClient = () => sock;
 const getIsReady = () => isReady;
-const getQRCode = () => pairingCode;  // Return pairing code instead
+const getQRCode = () => pairingCode;
 
 const waitUntilReady = (ms = 120000) => new Promise((resolve, reject) => {
   if (isReady) return resolve(true);
