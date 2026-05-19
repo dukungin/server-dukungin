@@ -8,6 +8,20 @@ const path = require('path');
 const connectDB = require('./config/database');
 const { donationQueue, QueueItem } = require('./utils/donationQueue');
 
+const updateAvailableBalance = require('./cron/updateAvailableBalance');
+
+// Jalankan setiap 1 menit
+setInterval(updateAvailableBalance, 60 * 1000); 
+
+// Jalankan juga saat server start - tapi dengan try-catch
+(async () => {
+  try {
+    await updateAvailableBalance();
+  } catch (err) {
+    console.log('[Cron] Skipped on startup - database not ready yet');
+  }
+})();
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {

@@ -5,17 +5,13 @@ const mongoose = require('mongoose'); // pindah ke atas, jangan require dalam fu
 exports.getDonationHistory = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { page = 1, limit = 50, status = 'PAID', startDate, endDate } = req.query; // ✅ DEFAULT = 'PAID'
+    // PASTIKAN LIMIT DATANG DARI FRONTEND
+    const { page = 1, limit = 20, status = 'PAID', startDate, endDate } = req.query;
 
     const query = { 
       userId: new mongoose.Types.ObjectId(userId),
-      status: 'PAID' // ✅ HARUS PAID
+      status: 'PAID' // Default filter
     };
-
-    // Override status filter - hanya PAID yang diizinkan
-    if (status && status !== 'PAID') {
-      return res.status(400).json({ message: 'Hanya donasi PAID yang tersedia' });
-    }
 
     if (startDate || endDate) {
       query.createdAt = {};
@@ -26,13 +22,9 @@ exports.getDonationHistory = async (req, res) => {
     const skip = (Number(page) - 1) * Number(limit);
 
     const [donations, total] = await Promise.all([
+      // Pastikan Number(limit) digunakan agar paginationnya jalan
       Donation.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
       Donation.countDocuments(query),
-    ]);
-
-    const totalPaid = await Donation.aggregate([
-      { $match: { userId: new mongoose.Types.ObjectId(userId), status: 'PAID' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
 
     res.json({
@@ -40,12 +32,8 @@ exports.getDonationHistory = async (req, res) => {
       pagination: {
         total,
         page: Number(page),
-        limit: Number(limit),
+        limit: Number(limit), // Echo back limit yang dipakai
         totalPages: Math.ceil(total / Number(limit)),
-      },
-      summary: {
-        totalPaid: totalPaid[0]?.total || 0,
-        totalCount: total,
       },
     });
   } catch (err) {
