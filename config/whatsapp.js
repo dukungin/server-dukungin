@@ -1,7 +1,9 @@
+// config/whatsapp.js - VERSI AKHIR
 const { 
   makeWASocket, 
   useMultiFileAuthState, 
-  fetchLatestBaileysVersion 
+  fetchLatestBaileysVersion,
+  delay 
 } = require('baileys');
 const fs = require('fs');
 const path = require('path');
@@ -12,17 +14,8 @@ let pairingCode = null;
 
 const sendTracker = { date: null, count: 0, MAX_PER_DAY: 50 };
 
-// ✅ BUAT LOGGER SEDERHANA
-const logger = {
-  info: (...args) => console.log('[WA INFO]', ...args),
-  error: (...args) => console.error('[WA ERROR]', ...args),
-  warn: (...args) => console.warn('[WA WARN]', ...args),
-  debug: (...args) => console.log('[WA DEBUG]', ...args),
-  child: () => logger,  // ⬅️ FIX DI SINI
-};
-
 const initWhatsApp = async () => {
-  console.log('[WA] Starting Baileys with Pairing Code...');
+  console.log('[WA] Starting Baileys...');
   
   if (sock && isReady) {
     console.log('[WA] Already connected!');
@@ -38,11 +31,11 @@ const initWhatsApp = async () => {
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
     const { version } = await fetchLatestBaileysVersion();
 
-    // ✅ TANPA OPTION LOGGER!
+    console.log('[WA] Creds:', state.creds?.me?.id ? 'EXISTS' : 'EMPTY');
+
     sock = makeWASocket({
       version,
       auth: state,
-      // ✌️ Hapus: logger: console,
       browser: ['Dukungin Server', 'Chrome', '120'],
     });
 
@@ -50,17 +43,16 @@ const initWhatsApp = async () => {
 
     sock.ev.on('connection.update', async (update) => {
       const { connection, code } = update;
+      console.log('[WA] Update:', connection);
       
-      if (code) {
+      if (code && !isReady) {
         console.log('\n🎯 PAIRING CODE:', code);
-        console.log('📱 Buka WhatsApp → Settings → Linked Devices → Link a Device');
-        console.log('🔢 Masukin kode:', code, '\n');
+        console.log('📱 WhatsApp → Settings → Linked Devices\n');
         pairingCode = code;
       }
       
       if (connection === 'open') {
         isReady = true;
-        pairingCode = null;
         console.log('✅ WhatsApp TERHUBUNG!');
       } else if (connection === 'close') {
         isReady = false;
@@ -68,31 +60,63 @@ const initWhatsApp = async () => {
       }
     });
 
-    // Wait for connection (max 2 menit)
-    let attempts = 0;
-    while (!isReady && attempts < 120) {
-      await new Promise(r => setTimeout(r, 1000));
-      attempts++;
-      if (pairingCode) {
-        console.log('[WA] Waiting for pairing...', attempts);
-      } else if (!isReady) {
-        console.log('[WA] Waiting for connection...', attempts);
+    // ✅ TUNGGU WEBSOCKET OPEN LEBIH LAMA
+    console.log('[WA] Waiting for WebSocket...');
+    for (let i = 0; i < 30; i++) {
+      await delay(500);
+      if (sock.ws && sock.ws.readyState === 1) {
+        console.log('[WA] ✅ WebSocket OPEN after', (i+1)/2, 'seconds');
+        break;
+      }
+      if (i === 29) {
+        console.log('[WA] ❌ WebSocket timeout!');
+        return null;
       }
     }
 
-    if (!isReady) {
-      console.log('[WA] ❌ Connection timeout!');
+    // ✅ BARU REQUEST PAIRING KALO GAK ADA CREDS
+    if (!state.creds?.me?.id) {
+      console.log('[WA] Requesting pairing code...');
+      try {
+        // ⬅️ TAMBAH DELAY LEBIH LAMA!
+        await delay(5000);
+        
+        const code = await sock.requestPairingCode('6289513093406');
+        console.log('\n🎯 PAIRING CODE:', code);
+        console.log('📱 WhatsApp → Settings → Linked Devices → Link a device');
+        console.log('📝 Masukkan kode ini:', code, '\n');
+        pairingCode = code;
+      } catch (e) {
+        console.log('[WA] Pairing error:', e.message);
+      }
     }
 
+    // ✅ TUNGGU SAMPAI TERHUBUNG
+    for (let i = 0; i < 120; i++) {
+      await delay(1000);
+      if (isReady) {
+        console.log('[WA] ✅ Connected after', i, 'seconds');
+        break;
+      }
+      if (i % 15 === 0) {
+        console.log('[WA] Still waiting...', i, 'seconds');
+      }
+    }
+
+    if (!isReady && pairingCode) {
+      console.log('\n📱 MASUKKAN KODEINI KE WHATSAPP SEKARANG!');
+      console.log('🎯 KODE:', pairingCode, '\n');
+    }
+    
     return sock;
     
   } catch (err) {
     console.error('[WA] Error:', err.message);
-    console.error('[WA] Stack:', err.stack);
     return null;
   }
 };
 
+// Exports
 const canSendMessage = () => {
   const today = new Date().toISOString().split('T')[0];
   if (sendTracker.date !== today) {
