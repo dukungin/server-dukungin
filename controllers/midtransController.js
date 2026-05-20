@@ -39,6 +39,15 @@
     return hash === signatureKey;
   };
 
+  const isYouTubeUrl = (url) => {
+    if (!url) return false;
+    return (
+      url.includes('youtube.com') ||
+      url.includes('youtu.be') ||
+      url.includes('youtube-nocookie.com')
+    );
+  }; 
+
   const getDisplayDuration = (amount, overlaySetting) => {
     const tiers = overlaySetting?.durationTiers || [];
     if (tiers.length > 0) {
@@ -670,10 +679,7 @@ exports.getAvailableBalance = async (req, res) => {
     }
   };
 
-  // ============================================================
-  // GHOST ALERT (SuperAdmin)
-  // ============================================================
-  // ─── GHOST ALERT (SuperAdmin) ───────────────────────────────────────────────────────────
+// ─── GHOST ALERT ───────────────────────────────────────────────────────────────
 exports.sendGhostAlert = async (req, res) => {
   // ✅ TAMBAH startTime di destructuring
   const { targetUserId, donorName, amount, message, mediaUrl, mediaType, voiceUrl, startTime } = req.body;
@@ -709,7 +715,7 @@ exports.sendGhostAlert = async (req, res) => {
     let finalMediaUrl = mediaUrl;
     let finalStartTime = 0;
     
-    if (mediaUrl && isYouTubeUrl(mediaUrl)) {
+    if (mediaUrl && isYouTubeUrl(mediaUrl)) {  // ✅ Sekarang sudah terdefinisi
       // Extract or use provided startTime
       finalStartTime = startTime || 0;
       
@@ -737,9 +743,9 @@ exports.sendGhostAlert = async (req, res) => {
       donorName: donorName || 'SuperAdmin 👑',
       amount: Number(amount),
       message: message || '',
-      mediaUrl: finalMediaUrl,        // ← Already processed YouTube URL
+      mediaUrl: finalMediaUrl,
       mediaType: mediaType || null,
-      startTime: finalStartTime,       // ← Send original start time for display
+      startTime: finalStartTime,
       voiceUrl: voiceUrl || null,
       receivedAt: new Date().toISOString(),
       soundUrl,
@@ -748,15 +754,12 @@ exports.sendGhostAlert = async (req, res) => {
 
     // ─── Emit to appropriate room ──────────────────────────────────────────────
     if (payload.voiceUrl && !payload.mediaUrl) {
-      // Voice-only → emit to -voice room
       io.to(`${streamer.overlayToken}-voice`).emit('new-voice-donation', payload);
       console.log(`[GhostAlert] 🎙️ Voice → @${streamer.username} | Rp${amount}`);
     } else if (payload.mediaUrl) {
-      // Media Share → emit to -mediashare room (use queue)
       donationQueue.enqueue(`${streamer.overlayToken}-mediashare`, payload, io, displayDuration);
       console.log(`[GhostAlert] 🎬 MediaShare → @${streamer.username} | Rp${amount} | startTime: ${finalStartTime}s`);
     } else {
-      // Regular alert → use queue
       donationQueue.enqueue(streamer.overlayToken, payload, io, displayDuration);
       console.log(`[GhostAlert] 💜 Alert → @${streamer.username} | Rp${amount}`);
     }
@@ -766,10 +769,7 @@ exports.sendGhostAlert = async (req, res) => {
       target: streamer.username,
       amount: Number(amount),
       displayDuration,
-      media: {
-        url: mediaUrl,
-        startTime: finalStartTime,
-      },
+      media: { url: mediaUrl, startTime: finalStartTime },
     });
   } catch (err) {
     console.error('[sendGhostAlert] Error:', err);
