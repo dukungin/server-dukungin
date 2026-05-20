@@ -115,8 +115,8 @@ app.get('/testing', (req, res) => {
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/api/wa', waRoutes);
 app.use('/api/suggestions', suggestionRoutes);
-app.use('/api/overlay',      overlayRoutes);
 app.use('/api/midtrans',     midtransRoutes);
+app.use('/api/overlay',      overlayRoutes);
 app.use('/api/auth',         authRoutes);
 app.use('/api/donations',    donationRoutes);
 app.use('/api/voice',        voiceRoutes);
