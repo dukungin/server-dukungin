@@ -680,103 +680,106 @@ exports.getAvailableBalance = async (req, res) => {
     }
   };
 
-// ─── GHOST ALERT ───────────────────────────────────────────────────────────────
-exports.sendGhostAlert = async (req, res) => {
-  // ✅ TAMBAH startTime di destructuring
-  const { targetUserId, donorName, amount, message, mediaUrl, mediaType, voiceUrl, startTime } = req.body;
+  // ─── GHOST ALERT ───────────────────────────────────────────────────────────────
+  exports.sendGhostAlert = async (req, res) => {
+    const { targetUserId, donorName, amount, message, mediaUrl, mediaType, voiceUrl, startTime } = req.body;
 
-  if (!targetUserId) {
-    return res.status(400).json({ message: 'targetUserId wajib diisi' });
-  }
-  if (!amount || Number(amount) < 1000) {
-    return res.status(400).json({ message: 'Nominal minimal Rp 1.000' });
-  }
-
-  try {
-    const streamer = await User.findById(targetUserId).lean();
-    if (!streamer) {
-      return res.status(404).json({ message: 'Streamer tidak ditemukan' });
+    if (!targetUserId) {
+      return res.status(400).json({ message: 'targetUserId wajib diisi' });
     }
-    if (!streamer.overlayToken) {
-      return res.status(400).json({ message: 'Streamer belum memiliki overlay token' });
+    if (!amount || Number(amount) < 1000) {
+      return res.status(400).json({ message: 'Nominal minimal Rp 1.000' });
     }
 
-    const overlaySetting = await OverlaySetting.findOne({ userId: streamer._id });
-    const displayDuration = getDisplayDuration(Number(amount), overlaySetting);
-    const soundUrl = overlaySetting?.getSoundForAmount
-      ? overlaySetting.getSoundForAmount(Number(amount))
-      : (overlaySetting?.soundUrl || null);
-
-    const io = req.app.get('socketio');
-    if (!io) {
-      return res.status(500).json({ message: 'Socket.IO tidak tersedia' });
-    }
-
-    // ─── Generate YouTube embed URL with start time ───────────────────────────
-    let finalMediaUrl = mediaUrl;
-    let finalStartTime = 0;
-    
-    if (mediaUrl && isYouTubeUrl(mediaUrl)) {  // ✅ Sekarang sudah terdefinisi
-      // Extract or use provided startTime
-      finalStartTime = startTime || 0;
-      
-      // Generate embed URL with start parameter
-      let videoId = '';
-      if (mediaUrl.includes('youtu.be')) {
-        videoId = mediaUrl.split('youtu.be/')[1]?.split(/[?&]/)[0];
-      } else {
-        try {
-          const urlObj = new URL(mediaUrl);
-          videoId = urlObj.searchParams.get('v') || '';
-        } catch { /* fallback */ }
+    try {
+      const streamer = await User.findById(targetUserId).lean();
+      if (!streamer) {
+        return res.status(404).json({ message: 'Streamer tidak ditemukan' });
       }
+      if (!streamer.overlayToken) {
+        return res.status(400).json({ message: 'Streamer belum memiliki overlay token' });
+      }
+
+      const overlaySetting = await OverlaySetting.findOne({ userId: streamer._id });
+      const displayDuration = getDisplayDuration(Number(amount), overlaySetting);
+      const soundUrl = overlaySetting?.getSoundForAmount
+        ? overlaySetting.getSoundForAmount(Number(amount))
+        : (overlaySetting?.soundUrl || null);
+
+      const io = req.app.get('socketio');
+      if (!io) {
+        return res.status(500).json({ message: 'Socket.IO tidak tersedia' });
+      }
+
+      // ─── Generate YouTube embed URL with start time ───────────────────────────
+      let finalMediaUrl = mediaUrl;
+      let finalStartTime = 0;
       
-      if (videoId) {
-        let embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1`;
-        if (finalStartTime > 0) {
-          embedUrl += `&start=${finalStartTime}`;
+      if (mediaUrl && isYouTubeUrl(mediaUrl)) {
+        finalStartTime = startTime || 0;
+        
+        let videoId = '';
+        if (mediaUrl.includes('youtu.be')) {
+          videoId = mediaUrl.split('youtu.be/')[1]?.split(/[?&]/)[0];
+        } else {
+          try {
+            const urlObj = new URL(mediaUrl);
+            videoId = urlObj.searchParams.get('v') || '';
+          } catch { /* fallback */ }
         }
-        finalMediaUrl = embedUrl;
+        
+        if (videoId) {
+          let embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1`;
+          if (finalStartTime > 0) {
+            embedUrl += `&start=${finalStartTime}`;
+          }
+          finalMediaUrl = embedUrl;
+        }
       }
+
+      const payload = {
+        donorName: donorName || 'SuperAdmin 👑',
+        amount: Number(amount),
+        message: message || '',
+        mediaUrl: finalMediaUrl,
+        mediaType: mediaType || null,
+        startTime: finalStartTime,
+        voiceUrl: voiceUrl || null,
+        receivedAt: new Date().toISOString(),
+        soundUrl,
+        isGhostAlert: true,
+      };
+
+      // ─── Emit berdasarkan tipe ─────────────────────────────────────────────────
+      // ✅ Voice + MediaShare → ke room masing-masing
+      if (payload.voiceUrl && !payload.mediaUrl) {
+        // Voice only → room -voice
+        io.to(`${streamer.overlayToken}-voice`).emit('new-voice-donation', payload);
+        console.log(`[GhostAlert] 🎙️ Voice → @${streamer.username} (room -voice)`);
+      } 
+      else if (payload.mediaUrl) {
+        // MediaShare → room -mediashare (bukan main room!)
+        io.to(`${streamer.overlayToken}-mediashare`).emit('new-media-donation', payload);
+        console.log(`[GhostAlert] 🎬 MediaShare → @${streamer.username} (room -mediashare)`);
+      } 
+      else {
+        // Regular alert → main room
+        io.to(streamer.overlayToken).emit('new-donation', payload);
+        console.log(`[GhostAlert] 💜 Alert → @${streamer.username} (main room)`);
+      }
+
+      return res.json({
+        message: `Ghost alert berhasil dikirim ke @${streamer.username}`,
+        target: streamer.username,
+        amount: Number(amount),
+        displayDuration,
+        media: { url: mediaUrl, startTime: finalStartTime },
+      });
+    } catch (err) {
+      console.error('[sendGhostAlert] Error:', err);
+      return res.status(500).json({ message: 'Server error', error: err.message });
     }
-
-    const payload = {
-      donorName: donorName || 'SuperAdmin 👑',
-      amount: Number(amount),
-      message: message || '',
-      mediaUrl: finalMediaUrl,
-      mediaType: mediaType || null,
-      startTime: finalStartTime,
-      voiceUrl: voiceUrl || null,
-      receivedAt: new Date().toISOString(),
-      soundUrl,
-      isGhostAlert: true,
-    };
-
-    // ─── Emit to appropriate room ──────────────────────────────────────────────
-    if (payload.voiceUrl && !payload.mediaUrl) {
-      io.to(`${streamer.overlayToken}-voice`).emit('new-voice-donation', payload);
-      console.log(`[GhostAlert] 🎙️ Voice → @${streamer.username} | Rp${amount}`);
-    } else if (payload.mediaUrl) {
-      donationQueue.enqueue(`${streamer.overlayToken}-mediashare`, payload, io, displayDuration);
-      console.log(`[GhostAlert] 🎬 MediaShare → @${streamer.username} | Rp${amount} | startTime: ${finalStartTime}s`);
-    } else {
-      donationQueue.enqueue(streamer.overlayToken, payload, io, displayDuration);
-      console.log(`[GhostAlert] 💜 Alert → @${streamer.username} | Rp${amount}`);
-    }
-
-    return res.json({
-      message: `Ghost alert berhasil dikirim ke @${streamer.username}`,
-      target: streamer.username,
-      amount: Number(amount),
-      displayDuration,
-      media: { url: mediaUrl, startTime: finalStartTime },
-    });
-  } catch (err) {
-    console.error('[sendGhostAlert] Error:', err);
-    return res.status(500).json({ message: 'Server error', error: err.message });
-  }
-};
+  };
 
   exports.getAllUsers = async (req, res) => {
     try {
