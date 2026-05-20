@@ -111,6 +111,7 @@ app.get('/testing', (req, res) => {
 });
 
 
+app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/api/wa', waRoutes);
 app.use('/api/overlay',      overlayRoutes);
 app.use('/api/midtrans',     midtransRoutes);
@@ -124,7 +125,6 @@ app.use('/widget',           widgetRoutes);
 app.use('/api/subathon',     subathonRoutes);
 app.use('/api/polls',        pollRoutes);
 app.use('/api/test-alert',   testAlertRoutes);
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 const PORT = process.env.PORT || 5101;
 
