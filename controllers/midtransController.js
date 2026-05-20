@@ -73,7 +73,8 @@
       return res.status(400).json({ message: 'Amount dan userId wajib diisi' });
     }
 
-    const nominal = Math.round(Number(amount)); // Nominal yang diinput donor
+    const nominal = Math.round(Number(amount)); 
+    // OK, Nominal yang diinput donor
     const orderId = `donasi-${userId}-${Date.now()}`;
 
     try {
