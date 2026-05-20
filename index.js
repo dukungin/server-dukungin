@@ -62,7 +62,7 @@ console.log('   → /uploads/audio   → Audio Files');
 io.on('connection', (socket) => {
   socket.on('join-room', async (token) => {
     socket.join(token);
-    console.log(`[Socket] Client join room: ${token}`);
+    // console.log(`[Socket] Client join room: ${token}`);
 
     const pendingCount = await QueueItem.countDocuments({
       overlayToken: token,
