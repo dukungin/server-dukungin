@@ -7,6 +7,7 @@ const Milestone         = require('./milestone'); // ← tambah ini
 const BannedWord = require('./bannedWord');
 const Subathon = require('./subathon');
 const Poll = require('./poll');
+const Suggestion = require('./suggestion');
 
 module.exports = {
   User,
@@ -17,5 +18,6 @@ module.exports = {
   Milestone,
   BannedWord,
   Subathon,
-  Poll
+  Poll,
+  Suggestion
 };

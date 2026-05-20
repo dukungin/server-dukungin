@@ -105,6 +105,7 @@ const pollRoutes       = require('./routers/pollRouter');
 const testAlertRoutes  = require('./routers/testAlertRouter');
 const voiceRoutes      = require('./routers/voiceRouter');
 const waRoutes = require('./routers/waRouter');
+const suggestionRoutes = require('./routers/suggestionRouter');
 
 app.get('/testing', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running!', node_env: process.env.NODE_ENV });
@@ -113,6 +114,7 @@ app.get('/testing', (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/api/wa', waRoutes);
+app.use('/api/suggestions', suggestionRoutes);
 app.use('/api/overlay',      overlayRoutes);
 app.use('/api/midtrans',     midtransRoutes);
 app.use('/api/auth',         authRoutes);
