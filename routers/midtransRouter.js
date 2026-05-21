@@ -130,15 +130,16 @@ router.post('/replay-donation/:donationId', authMiddleware, async (req, res) => 
       receivedAt: new Date().toISOString(),
       soundUrl:   null,
       isReplay:   true,
+      isMediaShare: !!donation.mediaUrl && ['video', 'youtube'].includes(donation.mediaType),
     };
 
-    // ✅ BYPASS QUEUE — langsung emit ke overlay
-    // Replay tidak boleh ganggu antrian donasi real
+    // ✅ GANTI LOGIC EMIT
     if (payload.voiceUrl && !payload.mediaUrl) {
-      // Voice replay → emit ke room voice
       io.to(`${streamer.overlayToken}-voice`).emit('new-voice-donation', payload);
+    } else if (payload.isMediaShare && payload.mediaUrl) {
+      // ✅ Media share → room yang benar
+      io.to(`${streamer.overlayToken}-mediashare`).emit('new-media-donation', payload);
     } else {
-      // Alert/mediashare replay → emit langsung, skip queue
       io.to(streamer.overlayToken).emit('new-donation', payload);
     }
 
