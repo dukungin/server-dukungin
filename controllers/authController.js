@@ -67,9 +67,12 @@ exports.register = async (req, res) => {
     console.log('1. Start register:', email);
 
     // 1. Cek duplikasi
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email sudah digunakan' });
+    const existing = await User.findOne({ $or: [{ email }, { username }] });
+    if (existing) {
+      if (existing.email === email) {
+        return res.status(400).json({ message: 'Email sudah digunakan' });
+      }
+      return res.status(400).json({ message: 'Username sudah digunakan' });
     }
 
     // 2. Persiapkan PIN
