@@ -64,6 +64,24 @@ const checkYouTubeVideo = async (url) => {
     return { safe: false, reason: 'Video diblokir di Indonesia' };
   }
 
+  // ← TARUH DI SINI
+  const title = snippet?.title?.toLowerCase() || '';
+  const description = snippet?.description?.toLowerCase() || '';
+
+  const sensitiveKeywords = [
+    '18+', '18 +', '(18)', '[18+]',
+    'adult', 'xxx', 'porn', 'bokep',
+    'dewasa', 'vulgar', 'explicit',
+  ];
+
+  const hasSensitiveKeyword = sensitiveKeywords.some(
+    (kw) => title.includes(kw) || description.includes(kw)
+  );
+
+  if (hasSensitiveKeyword) {
+    return { safe: false, reason: 'Video mengandung indikasi konten dewasa' };
+  }
+
   return {
     safe: true,
     videoId,
