@@ -38,7 +38,7 @@ const checkYouTubeVideo = async (url) => {
     video = res.data.items?.[0];
   } catch (err) {
     console.error('[YouTube API] Error:', err.message);
-    return { safe: false, reason: 'Gagal mengecek video' };
+    throw new Error('YouTube API tidak tersedia'); // ← throw, bukan return safe: false
   }
 
   // Video tidak ada / private / dihapus

@@ -127,20 +127,23 @@ const { checkYouTubeVideo } = require('../utils/checkYoutube');
         return res.status(400).json({ message: 'Pesan mengandung kata terlarang.' });
       }
 
-      // ─── Tambahkan ini tepat setelah blok di atas ─────────────────────────────
-      // Validasi YouTube jika ada mediaUrl yang YouTube
-      if (mediaUrl && isYouTubeUrl(mediaUrl)) {
-        const ytCheck = await checkYouTubeVideo(mediaUrl);
-        if (!ytCheck.safe) {
-          return res.status(400).json({
-            message: `Video tidak dapat ditampilkan: ${ytCheck.reason}`,
-            code: 'YOUTUBE_BLOCKED',
-          });
-        }
-        console.log(`[YT Check] ✅ "${ytCheck.title}" by ${ytCheck.channel} — aman`);
-      }
-      // ─────────────────────────────────────────────────────────────────────────
+      let videoBlocked = false;
+      let blockReason = null;
 
+      if (mediaUrl && isYouTubeUrl(mediaUrl)) {
+        try {
+          const ytCheck = await checkYouTubeVideo(mediaUrl);
+          if (!ytCheck.safe) {
+            videoBlocked = true;
+            blockReason = ytCheck.reason;
+            console.log(`[YT Check] ⛔ Blocked: ${blockReason}`);
+          } else {
+            console.log(`[YT Check] ✅ "${ytCheck.title}" — aman`);
+          }
+        } catch (err) {
+          console.warn('[YT Check] ⚠️ Check gagal, video diloloskan:', err.message);
+        }
+      }
   
       // Validasi pollVote jika ada
       let validatedPollVote = null;
@@ -166,6 +169,8 @@ const { checkYouTubeVideo } = require('../utils/checkYoutube');
         message:     filtered || '',
         amount: nominal,                    // nominal input donor
         grossAmount,
+        videoBlocked,       // ← tambah
+        blockReason,        // ← tambah
         voiceUrl: voiceUrl || null,  // ← TAMBAH INI
         paymentUrl:  snapResponse.redirect_url,
         status:      'PENDING',

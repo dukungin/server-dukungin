@@ -50,7 +50,8 @@ const donationSchema = new mongoose.Schema(
     // isAvailable: apakah sudah masuk ke availableBalance user
     // diset true oleh cron setelah availableAt terlewati
     isAvailable: { type: Boolean, default: false },
-
+    videoBlocked: { type: Boolean, default: false },
+    blockReason:  { type: String, default: null },
     // ── Media & misc ──────────────────────────────────────────
     startTime: { type: Number, default: 0 },
     voiceUrl:  { type: String, default: null },
