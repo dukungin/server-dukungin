@@ -14,6 +14,7 @@ const extractVideoId = (url) => {
     /youtu\.be\/([\w-]+)/,
     /youtube\.com\/shorts\/([\w-]+)/,
     /youtube\.com\/embed\/([\w-]+)/,
+    /youtube\.com\/live\/([\w-]+)/
   ];
   for (const p of patterns) {
     const m = url.match(p);

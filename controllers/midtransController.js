@@ -738,15 +738,31 @@ exports.getAvailableBalance = async (req, res) => {
       if (mediaUrl && isYouTubeUrl(mediaUrl)) {
         finalStartTime = startTime || 0;
         
+        // let videoId = '';
+        // if (mediaUrl.includes('youtu.be')) {
+        //   videoId = mediaUrl.split('youtu.be/')[1]?.split(/[?&]/)[0];
+        // } else {
+        //   try {
+        //     const urlObj = new URL(mediaUrl);
+        //     videoId = urlObj.searchParams.get('v') || '';
+        //   } catch { /* fallback */ }
+        // }
+
         let videoId = '';
-        if (mediaUrl.includes('youtu.be')) {
-          videoId = mediaUrl.split('youtu.be/')[1]?.split(/[?&]/)[0];
-        } else {
-          try {
-            const urlObj = new URL(mediaUrl);
-            videoId = urlObj.searchParams.get('v') || '';
-          } catch { /* fallback */ }
-        }
+          if (mediaUrl.includes('youtu.be')) {
+            videoId = mediaUrl.split('youtu.be/')[1]?.split(/[?&]/)[0];
+          } else {
+            try {
+              const urlObj = new URL(mediaUrl);
+              videoId = urlObj.searchParams.get('v') || '';
+              
+              // ← tambah ini untuk /live/
+              if (!videoId) {
+                const liveMatch = mediaUrl.match(/youtube\.com\/live\/([\w-]+)/);
+                if (liveMatch) videoId = liveMatch[1];
+              }
+            } catch { /* fallback */ }
+          }
         
         if (videoId) {
           let embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1`;
