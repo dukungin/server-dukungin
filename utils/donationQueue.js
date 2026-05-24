@@ -86,8 +86,9 @@ class DonationQueueManager {
 
       } else if (payload.mediaUrl) {
         // ✅ Media Share → emit ke room -mediashare dengan event new-media-donation
-        io.to(`${overlayToken}-mediashare`).emit('new-media-donation', payload);
         console.log(`[Queue] 🎬 MediaShare → "${payload.donorName}" Rp${payload.amount}`);
+        console.log(`[Queue] 🎬 mediaUrl yang di-emit: ${payload.mediaUrl}`);
+        io.to(`${overlayToken}-mediashare`).emit('new-media-donation', payload);
 
       } else {
         // 💜 Regular alert overlay
