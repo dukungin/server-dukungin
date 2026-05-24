@@ -67,7 +67,7 @@ const { checkYouTubeVideo } = require('../utils/checkYoutube');
     const {
       amount, donorName, message, userId, email,
       mediaUrl, mediaType, donorUserId, soundUrl,
-      pollVote, voiceUrl
+      pollVote, voiceUrl, isMediaShare
     } = req.body;
 
     if (!amount || !userId) {
@@ -167,6 +167,7 @@ const { checkYouTubeVideo } = require('../utils/checkYoutube');
         // amount:      Math.round(Number(amount)),
         donorName:   donorName || 'Anonim',
         message:     filtered || '',
+        isMediaShare: isMediaShare || false,  // ← tambah ini
         amount: nominal,                    // nominal input donor
         grossAmount,
         videoBlocked,       // ← tambah
@@ -347,6 +348,7 @@ const { checkYouTubeVideo } = require('../utils/checkYoutube');
             voiceUrl:     dataDonasi.voiceUrl || null,
             mediaUrl:     dataDonasi.mediaUrl || null,
             mediaType:    dataDonasi.mediaType || null,
+            isMediaShare: donation.isMediaShare,  // ← harus ada ini
             startTime:    dataDonasi.startTime || 0,
             soundUrl:     dataDonasi.soundUrl || soundUrl,  // prioritas: pilihan donor > default overlay
             receivedAt:   new Date().toISOString(),

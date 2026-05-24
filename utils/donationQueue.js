@@ -84,7 +84,7 @@ class DonationQueueManager {
         setTimeout(() => this._processNext(overlayToken, io), nextDelay);
         return;
 
-      } else if (payload.isMediaShare && payload.mediaUrl) {
+      } else if (payload.mediaUrl) {
         // ✅ Media Share → emit ke room -mediashare dengan event new-media-donation
         io.to(`${overlayToken}-mediashare`).emit('new-media-donation', payload);
         console.log(`[Queue] 🎬 MediaShare → "${payload.donorName}" Rp${payload.amount}`);
