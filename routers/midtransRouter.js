@@ -231,19 +231,20 @@ router.get('/tiktok-resolve', async (req, res) => {
   if (!url) return res.status(400).json({ error: 'URL required' });
 
   try {
-    // Fetch dengan follow redirect, ambil final URL
     const response = await fetch(url, {
       method: 'GET',
       redirect: 'follow',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8',
+        'Referer': 'https://www.tiktok.com/',
       },
     });
 
-    const finalUrl = response.url; // URL setelah redirect
+    const finalUrl = response.url;
     console.log(`[TikTok Resolve] ${url} → ${finalUrl}`);
 
-    // Extract video ID dari final URL
     const match = finalUrl.match(/tiktok\.com\/@[\w.]+\/video\/(\d+)/);
     if (!match) {
       return res.json({ resolved: false, reason: 'Video ID tidak ditemukan' });
@@ -252,7 +253,7 @@ router.get('/tiktok-resolve', async (req, res) => {
     return res.json({
       resolved: true,
       videoId: match[1],
-      fullUrl: finalUrl,
+      fullUrl: finalUrl.split('?')[0], // ← buang query params biar bersih
       embedUrl: `https://www.tiktok.com/embed/v2/${match[1]}`,
     });
   } catch (err) {
