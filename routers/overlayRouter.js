@@ -11,8 +11,8 @@ const upload = require('../middleware/audioUpload');
 router.get('/settings',         authMiddleware, overlayCtrl.getSettings);      // ← bukan getOverlaySettings
 router.put('/settings',         authMiddleware, overlayCtrl.updateSettings);   // ← ganti POST ke PUT
 router.get('/public/:username', overlayCtrl.getPublicProfile);
-router.get('/store/:token', overlayCtrl.getStoreProducts);
-router.put('/store/:token', authMiddleware, overlayCtrl.updateStoreProducts);
+router.get('/store/:token', overlayCtrl.getStoreProducts);           // ← Public untuk OBS
+router.put('/store/:token', authMiddleware, overlayCtrl.updateStoreProducts); // ← Dashboard
 router.get('/config/:token',    overlayCtrl.getOverlaySettings);
 router.get('/tts/voices',  ttsCtrl.getVoiceList);   // tanpa auth — dipakai overlay OBS
 router.post('/tts/speak',  ttsCtrl.synthesize); 

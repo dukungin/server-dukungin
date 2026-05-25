@@ -173,17 +173,64 @@ exports.uploadPublicSound = async (req, res) => {
   }
 };
 
+// ====================== GET STORE PRODUCTS (untuk Widget OBS) ======================
 exports.getStoreProducts = async (req, res) => {
-  const setting = await OverlaySetting.findOne({ userId: req.params.token ? /* cari user dari token */ });
-  res.json({ products: setting?.storeProducts || [] });
+  try {
+    const { token } = req.params;
+
+    if (!token) {
+      return res.status(400).json({ message: 'Token diperlukan' });
+    }
+
+    // Cari user berdasarkan overlayToken
+    const user = await User.findOne({ overlayToken: token }).lean();
+
+    if (!user) {
+      return res.status(404).json({ message: 'Token tidak valid' });
+    }
+
+    // Ambil setting store milik user tersebut
+    const overlaySetting = await OverlaySetting.findOne({ 
+      userId: user._id 
+    }).select('storeProducts').lean();
+
+    res.json({
+      products: overlaySetting?.storeProducts || []
+    });
+
+  } catch (err) {
+    console.error('[getStoreProducts] Error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
 };
 
+// ====================== UPDATE STORE PRODUCTS ======================
 exports.updateStoreProducts = async (req, res) => {
-  const { products } = req.body;
-  const setting = await OverlaySetting.findOneAndUpdate(
-    { userId: req.user.id },
-    { $set: { storeProducts: products } },
-    { new: true, upsert: true }
-  );
-  res.json({ success: true, products: setting.storeProducts });
+  try {
+    const { products } = req.body;
+
+    if (!Array.isArray(products)) {
+      return res.status(400).json({ message: 'Products harus berupa array' });
+    }
+
+    const setting = await OverlaySetting.findOneAndUpdate(
+      { userId: req.user.id },
+      { 
+        $set: { 
+          storeProducts: products 
+        } 
+      },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Toko berhasil diperbarui',
+      products: setting.storeProducts 
+    });
+
+  } catch (err) {
+    console.error('[updateStoreProducts] Error:', err);
+    res.status(500).json({ message: 'Gagal menyimpan toko', error: err.message });
+  }
 };
