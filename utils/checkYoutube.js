@@ -46,50 +46,29 @@ const checkYouTubeVideo = async (url) => {
     return { safe: false, reason: 'Video tidak ditemukan atau private' };
   }
 
-  const { contentDetails, status, snippet, liveStreamingDetails } = video;
+  const { contentDetails, snippet } = video;
 
-  // ── Deteksi apakah ini live stream ──────────────────────────
   const isLiveFromUrl = /youtube\.com\/live\//i.test(url);
   const isLive = isLiveFromUrl ||
-               snippet?.liveBroadcastContent === 'live' ||
-               snippet?.liveBroadcastContent === 'upcoming' ||
-               !!liveStreamingDetails;
-               
-  console.log(`[YT Check] videoId: ${videoId} | isLive: ${isLive} | embeddable: ${status?.embeddable} | liveBroadcastContent: ${snippet?.liveBroadcastContent}`);
+    snippet?.liveBroadcastContent === 'live' ||
+    snippet?.liveBroadcastContent === 'upcoming';
 
   // Video 18+
   if (contentDetails?.contentRating?.ytRating === 'ytAgeRestricted') {
     return { safe: false, reason: 'Video dibatasi usia (18+)' };
   }
 
-  // Embeddable check — skip untuk live
-  if (!isLive && status?.embeddable === false) {
-    return { safe: false, reason: 'Video tidak bisa ditampilkan (embed dinonaktifkan)' };
-  }
-
-
   // Blokir regional
-  const regionRestriction = contentDetails?.regionRestriction;
-  if (regionRestriction?.blocked?.includes('ID')) {
+  if (contentDetails?.regionRestriction?.blocked?.includes('ID')) {
     return { safe: false, reason: 'Video diblokir di Indonesia' };
   }
 
-  // Sensitive keywords — skip untuk live (judul live sering berubah)
+  // Sensitive keywords — skip untuk live
   if (!isLive) {
     const title = snippet?.title?.toLowerCase() || '';
     const description = snippet?.description?.toLowerCase() || '';
-
-    const sensitiveKeywords = [
-      '18+', '18 +', '(18)', '[18+]',
-      'adult', 'xxx', 'porn', 'bokep',
-      'dewasa', 'vulgar', 'explicit',
-    ];
-
-    const hasSensitiveKeyword = sensitiveKeywords.some(
-      (kw) => title.includes(kw) || description.includes(kw)
-    );
-
-    if (hasSensitiveKeyword) {
+    const sensitiveKeywords = ['18+', '18 +', '(18)', '[18+]', 'adult', 'xxx', 'porn', 'bokep', 'dewasa', 'vulgar', 'explicit'];
+    if (sensitiveKeywords.some(kw => title.includes(kw) || description.includes(kw))) {
       return { safe: false, reason: 'Video mengandung indikasi konten dewasa' };
     }
   }
@@ -100,7 +79,6 @@ const checkYouTubeVideo = async (url) => {
     isLive,
     title: snippet?.title,
     channel: snippet?.channelTitle,
-    thumbnail: snippet?.thumbnails?.default?.url,
   };
 };
 
