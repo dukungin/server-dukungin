@@ -156,7 +156,8 @@
       let videoBlocked = false;
       let blockReason = null;
 
-      if (mediaUrl && isYouTubeUrl(mediaUrl)) {
+      const isLiveUrl = /youtube\.com\/live\//i.test(mediaUrl);
+      if (mediaUrl && isYouTubeUrl(mediaUrl) && !isLiveUrl) {
         try {
           const ytCheck = await checkYouTubeVideo(mediaUrl);
           if (!ytCheck.safe) {
@@ -376,6 +377,7 @@
             startTime:    startTime,
             soundUrl:     dataDonasi.soundUrl   || soundUrl,
             videoBlocked: dataDonasi.videoBlocked || false,
+            blockReason:  dataDonasi.blockReason  || null,  // ← TAMBAH INI
             receivedAt:   new Date().toISOString(),
           };
 
