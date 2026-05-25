@@ -225,4 +225,40 @@ router.post('/admin/fix-user-balance/:userId', async (req, res) => {
   });
 });
 
+// GET /api/tiktok-resolve?url=https://vt.tiktok.com/ZSxHCHVqL/
+router.get('/tiktok-resolve', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: 'URL required' });
+
+  try {
+    // Fetch dengan follow redirect, ambil final URL
+    const response = await fetch(url, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
+
+    const finalUrl = response.url; // URL setelah redirect
+    console.log(`[TikTok Resolve] ${url} → ${finalUrl}`);
+
+    // Extract video ID dari final URL
+    const match = finalUrl.match(/tiktok\.com\/@[\w.]+\/video\/(\d+)/);
+    if (!match) {
+      return res.json({ resolved: false, reason: 'Video ID tidak ditemukan' });
+    }
+
+    return res.json({
+      resolved: true,
+      videoId: match[1],
+      fullUrl: finalUrl,
+      embedUrl: `https://www.tiktok.com/embed/v2/${match[1]}`,
+    });
+  } catch (err) {
+    console.error('[TikTok Resolve] Error:', err.message);
+    return res.status(500).json({ resolved: false, reason: 'Gagal resolve URL' });
+  }
+});
+
 module.exports = router;
