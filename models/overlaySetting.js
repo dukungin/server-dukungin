@@ -123,6 +123,8 @@ const overlaySettingSchema = new mongoose.Schema(
     ttsRate: { type: Number, default: 1.0 },
     ttsPitch: { type: Number, default: 1.0 },
     ttsVolume: { type: Number, default: 1.0 },
+    ttsVoiceName:    { type: String,  default: 'id-ID-GadisNeural' },
+    ttsLanguageCode: { type: String,  default: 'id-ID' },
   },
   { timestamps: true }
 );

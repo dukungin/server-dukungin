@@ -68,7 +68,7 @@ exports.updateSettings = async (req, res) => {
       'mediaTriggers', 'soundUrl', 'customCss', 'highlightColor',
       'soundTiers', 'leaderboardShowAmount', 'quickAmounts', 'leaderboardLimit', 
       'leaderboardPeriod', 'publicSounds', 'publicSoundDefault',
-      'ttsEnabled', 'ttsRate', 'ttsPitch', 'ttsVolume',
+      'ttsEnabled', 'ttsRate', 'ttsPitch', 'ttsVolume', 'ttsVoiceName', 'ttsLanguageCode',  
       'feeBearer'
     ];
 

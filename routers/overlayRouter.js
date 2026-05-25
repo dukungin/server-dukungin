@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const overlayCtrl = require('../controllers/overlayController');
 const authMiddleware = require('../middleware/authMiddleware');
+const ttsCtrl = require('../controllers/ttsController');
 const { audioUpload } = require('../middleware/multerConfig');
 const { proxyAudio } = require('../utils/proxyAudio');
 const upload = require('../middleware/audioUpload');
@@ -11,6 +12,8 @@ router.get('/settings',         authMiddleware, overlayCtrl.getSettings);      /
 router.put('/settings',         authMiddleware, overlayCtrl.updateSettings);   // ← ganti POST ke PUT
 router.get('/public/:username', overlayCtrl.getPublicProfile);
 router.get('/config/:token',    overlayCtrl.getOverlaySettings);
+router.get('/tts/voices',  ttsCtrl.getVoiceList);   // tanpa auth — dipakai overlay OBS
+router.post('/tts/speak',  ttsCtrl.synthesize); 
 router.post('/upload-voice', upload.single('voice'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
