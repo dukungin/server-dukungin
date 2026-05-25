@@ -172,3 +172,18 @@ exports.uploadPublicSound = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+exports.getStoreProducts = async (req, res) => {
+  const setting = await OverlaySetting.findOne({ userId: req.params.token ? /* cari user dari token */ });
+  res.json({ products: setting?.storeProducts || [] });
+};
+
+exports.updateStoreProducts = async (req, res) => {
+  const { products } = req.body;
+  const setting = await OverlaySetting.findOneAndUpdate(
+    { userId: req.user.id },
+    { $set: { storeProducts: products } },
+    { new: true, upsert: true }
+  );
+  res.json({ success: true, products: setting.storeProducts });
+};

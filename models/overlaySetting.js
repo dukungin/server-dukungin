@@ -125,6 +125,14 @@ const overlaySettingSchema = new mongoose.Schema(
     ttsVolume: { type: Number, default: 1.0 },
     ttsVoiceName:    { type: String,  default: 'id-ID-GadisNeural' },
     ttsLanguageCode: { type: String,  default: 'id-ID' },
+
+    storeProducts: [{
+      name: String,
+      price: Number,
+      imageUrl: String,
+      link: String,
+      description: String
+    }],
   },
   { timestamps: true }
 );
