@@ -33,59 +33,66 @@ const checkYouTubeVideo = async (url) => {
   let video;
   try {
     const res = await youtube.videos.list({
-      part: ['contentDetails', 'status', 'snippet'],
+      part: ['contentDetails', 'status', 'snippet', 'liveStreamingDetails'],
       id: [videoId],
     });
     video = res.data.items?.[0];
   } catch (err) {
     console.error('[YouTube API] Error:', err.message);
-    throw new Error('YouTube API tidak tersedia'); // ← throw, bukan return safe: false
+    throw new Error('YouTube API tidak tersedia');
   }
 
-  // Video tidak ada / private / dihapus
   if (!video) {
     return { safe: false, reason: 'Video tidak ditemukan atau private' };
   }
 
-  const { contentDetails, status, snippet } = video;
+  const { contentDetails, status, snippet, liveStreamingDetails } = video;
+
+  // ── Deteksi apakah ini live stream ──────────────────────────
+  const isLive = snippet?.liveBroadcastContent === 'live' || 
+                 snippet?.liveBroadcastContent === 'upcoming' ||
+                 !!liveStreamingDetails;
 
   // Video 18+
   if (contentDetails?.contentRating?.ytRating === 'ytAgeRestricted') {
     return { safe: false, reason: 'Video dibatasi usia (18+)' };
   }
 
-  // Tidak bisa di-embed (tidak akan muncul di OBS)
-  if (status?.embeddable === false) {
+  // Embeddable check — skip untuk live stream karena live sering false tapi tetap bisa embed
+  if (!isLive && status?.embeddable === false) {
     return { safe: false, reason: 'Video tidak bisa ditampilkan (embed dinonaktifkan)' };
   }
 
-  // Video diblokir di negara tertentu (opsional)
+  // Blokir regional
   const regionRestriction = contentDetails?.regionRestriction;
   if (regionRestriction?.blocked?.includes('ID')) {
     return { safe: false, reason: 'Video diblokir di Indonesia' };
   }
 
-  // ← TARUH DI SINI
-  const title = snippet?.title?.toLowerCase() || '';
-  const description = snippet?.description?.toLowerCase() || '';
+  // Sensitive keywords — skip untuk live (judul live sering berubah)
+  if (!isLive) {
+    const title = snippet?.title?.toLowerCase() || '';
+    const description = snippet?.description?.toLowerCase() || '';
 
-  const sensitiveKeywords = [
-    '18+', '18 +', '(18)', '[18+]',
-    'adult', 'xxx', 'porn', 'bokep',
-    'dewasa', 'vulgar', 'explicit',
-  ];
+    const sensitiveKeywords = [
+      '18+', '18 +', '(18)', '[18+]',
+      'adult', 'xxx', 'porn', 'bokep',
+      'dewasa', 'vulgar', 'explicit',
+    ];
 
-  const hasSensitiveKeyword = sensitiveKeywords.some(
-    (kw) => title.includes(kw) || description.includes(kw)
-  );
+    const hasSensitiveKeyword = sensitiveKeywords.some(
+      (kw) => title.includes(kw) || description.includes(kw)
+    );
 
-  if (hasSensitiveKeyword) {
-    return { safe: false, reason: 'Video mengandung indikasi konten dewasa' };
+    if (hasSensitiveKeyword) {
+      return { safe: false, reason: 'Video mengandung indikasi konten dewasa' };
+    }
   }
 
   return {
     safe: true,
     videoId,
+    isLive,
     title: snippet?.title,
     channel: snippet?.channelTitle,
     thumbnail: snippet?.thumbnails?.default?.url,
