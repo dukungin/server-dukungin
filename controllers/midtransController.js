@@ -50,8 +50,6 @@
       try {
         const urlObj = new URL(url);
         videoId = urlObj.searchParams.get('v') || '';
-
-        // ← tambah handle /live/ dan /shorts/
         if (!videoId) {
           const pathMatch = url.match(/youtube\.com\/(live|shorts)\/([\w-]+)/);
           if (pathMatch) videoId = pathMatch[2];
@@ -61,10 +59,10 @@
 
     if (!videoId) return url;
 
-    const isLive = url.includes('/live/');
+    const isLive = /youtube\.com\/live\//i.test(url); // ← tambah deteksi dari URL
     let embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=0`;
     if (!isLive) embedUrl += `&loop=1&playlist=${videoId}`;
-    if (startTime > 0) embedUrl += `&start=${Math.floor(startTime)}`;
+    if (!isLive && startTime > 0) embedUrl += `&start=${Math.floor(startTime)}`; // ← jangan append start untuk live
     return embedUrl;
   };
 

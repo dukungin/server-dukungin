@@ -49,19 +49,24 @@ const checkYouTubeVideo = async (url) => {
   const { contentDetails, status, snippet, liveStreamingDetails } = video;
 
   // ── Deteksi apakah ini live stream ──────────────────────────
-  const isLive = snippet?.liveBroadcastContent === 'live' || 
-                 snippet?.liveBroadcastContent === 'upcoming' ||
-                 !!liveStreamingDetails;
+  const isLiveFromUrl = /youtube\.com\/live\//i.test(url);
+  const isLive = isLiveFromUrl ||
+               snippet?.liveBroadcastContent === 'live' ||
+               snippet?.liveBroadcastContent === 'upcoming' ||
+               !!liveStreamingDetails;
+               
+  console.log(`[YT Check] videoId: ${videoId} | isLive: ${isLive} | embeddable: ${status?.embeddable} | liveBroadcastContent: ${snippet?.liveBroadcastContent}`);
 
   // Video 18+
   if (contentDetails?.contentRating?.ytRating === 'ytAgeRestricted') {
     return { safe: false, reason: 'Video dibatasi usia (18+)' };
   }
 
-  // Embeddable check — skip untuk live stream karena live sering false tapi tetap bisa embed
+  // Embeddable check — skip untuk live
   if (!isLive && status?.embeddable === false) {
     return { safe: false, reason: 'Video tidak bisa ditampilkan (embed dinonaktifkan)' };
   }
+
 
   // Blokir regional
   const regionRestriction = contentDetails?.regionRestriction;
