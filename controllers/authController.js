@@ -318,27 +318,52 @@ exports.verifySecurityPin = async (req, res) => {
   try {
     const { email, securityPin } = req.body;
 
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
+    // Validasi input
+    if (!email || !securityPin || securityPin.length !== 4) {
+      return res.status(400).json({ 
+        message: 'Email dan PIN 4 digit wajib diisi dengan benar' 
+      });
+    }
 
-    if (!user.validSecurityPin(securityPin)) {
+    const user = await User.findOne({ email }).select('+securityPin'); // penting: ambil securityPin
+    if (!user) {
+      return res.status(404).json({ message: 'Email tidak terdaftar' });
+    }
+
+    // Cek apakah user punya securityPin
+    if (!user.securityPin) {
+      return res.status(400).json({ 
+        message: 'Akun ini belum memiliki PIN keamanan. Silakan hubungi admin.' 
+      });
+    }
+
+    // Verifikasi PIN
+    const isValid = await bcrypt.compare(securityPin, user.securityPin);
+    if (!isValid) {
       return res.status(400).json({ message: 'PIN salah' });
     }
 
-    // Berikan temporary reset token (short lived)
+    // Generate temporary token untuk reset password
     const tempResetToken = crypto.randomBytes(32).toString('hex');
-    
-    user.resetPasswordToken = crypto.createHash('sha256').update(tempResetToken).digest('hex');
-    user.resetPasswordExpired = new Date(Date.now() + 10 * 60 * 1000); // 10 menit
+    const hashedToken = crypto.createHash('sha256').update(tempResetToken).digest('hex');
+
+    // Simpan ke database
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpired = new Date(Date.now() + 15 * 60 * 1000); // 15 menit
     await user.save();
 
     res.json({
-      message: 'PIN benar',
-      tempToken: tempResetToken,
-      email
+      success: true,
+      message: 'PIN diterima',
+      tempToken: tempResetToken,   // token asli (plain)
+      email: user.email
     });
+
   } catch (err) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('VERIFY_SECURITY_PIN_ERROR:', err);
+    res.status(500).json({ 
+      message: 'Terjadi kesalahan server. Silakan coba lagi.' 
+    });
   }
 };
 
