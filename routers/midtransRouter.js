@@ -13,7 +13,7 @@ const { spawn } = require('child_process');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { rateLimitDonation } = require('../middleware/rateLimit');
+const { rateLimitDonation, rateLimitAuth } = require('../middleware/rateLimit');
 
 // Folder temp upload
 const TEMP_DIR = path.join(__dirname, '../temp-uploads');
