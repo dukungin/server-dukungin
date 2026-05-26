@@ -1,27 +1,29 @@
 // migrate-security-pin.js
 const mongoose = require('mongoose');
-const { User } = require('./models'); // ← Sesuaikan path dengan model kamu
+const bcrypt = require('bcryptjs');
+const { User } = require('./models');
 require('dotenv').config();
 
-async function addSecurityPinToExistingUsers() {
-  try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('✅ Terhubung ke MongoDB');
+async function fixSecurityPin() {
+  await mongoose.connect(process.env.MONGO_URI);
+  console.log('✅ Connected to MongoDB');
 
-    const result = await User.updateMany(
-      { securityPin: { $exists: false } },   // user yang belum punya field securityPin
-      { $set: { securityPin: '0000' } }      // kasih default PIN 0000
-    );
+  const users = await User.find({});
 
-    console.log(`🎉 Berhasil! ${result.modifiedCount} user telah ditambahkan field securityPin`);
-    
-  } catch (err) {
-    console.error('❌ Error saat migrasi:', err);
-  } finally {
-    await mongoose.disconnect();
-    console.log('🔌 Disconnect dari MongoDB');
+  let updated = 0;
+  for (let user of users) {
+    if (user.securityPin && user.securityPin.length <= 4) { 
+      // Masih plain text
+      const hashedPin = await bcrypt.hash(user.securityPin, 10);
+      user.securityPin = hashedPin;
+      await user.save();
+      updated++;
+      console.log(`✅ Fixed PIN for: ${user.email}`);
+    }
   }
+
+  console.log(`🎉 Selesai! ${updated} user telah diperbaiki.`);
+  process.exit();
 }
 
-// Jalankan
-addSecurityPinToExistingUsers();
+fixSecurityPin();
