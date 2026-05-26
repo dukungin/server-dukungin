@@ -58,6 +58,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    securityPin: { 
+      type: String,     // Hashed 4 digit PIN
+      required: true 
+    },
     verifyPin: {
       type: String,     // Hashed PIN
     },
@@ -93,13 +97,22 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ─── Hash password sebelum disimpan ───────────────────────────────────────────
+// Hash password & securityPin
 userSchema.pre('save', async function () {
-  // Hanya hash jika field password berubah
-  if (!this.isModified('password')) return;
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  if (this.isModified('password')) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
+  
+  if (this.isModified('securityPin')) {
+    const salt = await bcrypt.genSalt(10);
+    this.securityPin = await bcrypt.hash(this.securityPin, salt);
+  }
 });
+
+userSchema.methods.validSecurityPin = function (pin) {
+  return bcrypt.compareSync(pin, this.securityPin);
+};
 
 // ─── Method validasi password ─────────────────────────────────────────────────
 userSchema.methods.validPassword = function (password) {

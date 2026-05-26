@@ -19,6 +19,7 @@ router.post('/login', rateLimitAuthBasic, authCtrl.login);
 router.post('/verify-pin', rateLimitAuthBasic, authCtrl.verifyPin);
 router.post('/forgot-password', rateLimitAuthBasic, authCtrl.forgotPassword);
 router.post('/reset-password', rateLimitAuthBasic, authCtrl.resetPassword);
+router.post('/verify-security-pin', rateLimitAuthBasic, authCtrl.verifySecurityPin); // baru
 
 // Yang sudah login
 router.put('/profile', authMiddleware, rateLimitAuth, authCtrl.updateProfile);
