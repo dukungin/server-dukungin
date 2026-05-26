@@ -611,8 +611,8 @@ exports.getAvailableBalance = async (req, res) => {
     if (!grossAmount || isNaN(grossAmount) || grossAmount <= 0)
       return res.status(400).json({ message: 'Nominal tidak valid' });
 
-    if (grossAmount < 20000)
-      return res.status(400).json({ message: 'Minimal penarikan adalah Rp 20.000' });
+    if (grossAmount < 10000)
+      return res.status(400).json({ message: 'Minimal penarikan adalah Rp 10.000' });
 
     if (grossAmount > 10000000)
       return res.status(400).json({ message: 'Maksimal penarikan adalah Rp 10.000.000' });
