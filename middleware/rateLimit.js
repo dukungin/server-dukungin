@@ -100,9 +100,17 @@ setInterval(() => {
   }
 }, 300000);
 
+const rateLimitDonation = createRateLimit({
+  windowMs: 60 * 1000,
+  maxRequests: 8,
+  message: 'Terlalu banyak permintaan donasi.',
+  useEmail: false
+});
+
 module.exports = {
   createRateLimit,
   rateLimitAuth,
   rateLimitPublic,
+  rateLimitDonation,
   rateLimitUpload
 };
