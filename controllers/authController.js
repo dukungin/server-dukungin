@@ -313,49 +313,47 @@ exports.forgotPassword = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-
+// controllers/authController.js
 exports.verifySecurityPin = async (req, res) => {
   try {
     const { email, securityPin } = req.body;
 
-    // Validasi input
     if (!email || !securityPin || securityPin.length !== 4) {
       return res.status(400).json({ 
-        message: 'Email dan PIN 4 digit wajib diisi dengan benar' 
+        message: 'Email dan PIN 4 digit wajib diisi' 
       });
     }
 
-    const user = await User.findOne({ email }).select('+securityPin'); // penting: ambil securityPin
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'Email tidak terdaftar' });
     }
 
-    // Cek apakah user punya securityPin
     if (!user.securityPin) {
       return res.status(400).json({ 
-        message: 'Akun ini belum memiliki PIN keamanan. Silakan hubungi admin.' 
+        message: 'Akun ini belum memiliki PIN keamanan' 
       });
     }
 
-    // Verifikasi PIN
+    // === PAKAI BCRYPT LANGSUNG ===
     const isValid = await bcrypt.compare(securityPin, user.securityPin);
+
     if (!isValid) {
       return res.status(400).json({ message: 'PIN salah' });
     }
 
-    // Generate temporary token untuk reset password
+    // Generate temporary token
     const tempResetToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(tempResetToken).digest('hex');
 
-    // Simpan ke database
     user.resetPasswordToken = hashedToken;
     user.resetPasswordExpired = new Date(Date.now() + 15 * 60 * 1000); // 15 menit
     await user.save();
 
     res.json({
       success: true,
-      message: 'PIN diterima',
-      tempToken: tempResetToken,   // token asli (plain)
+      message: 'PIN benar',
+      tempToken: tempResetToken,
       email: user.email
     });
 
