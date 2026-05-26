@@ -5,23 +5,27 @@ const authCtrl = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
 const uploadImage = require('../middleware/imageUpload');
 const { User } = require('../models');
+const { rateLimitAuth } = require('../middleware/rateLimit');
 
-// ── Auth Dasar ─────────────────────────────────────────────
-router.post('/register',          authCtrl.register);
-router.post('/login',             authCtrl.login);
+// Rate limit untuk login/register (bukan authenticated, jadi hanya IP)
+const rateLimitAuthBasic = createRateLimit({
+  windowMs: 60 * 1000,
+  maxRequests: 5,  // Lebih ketat untuk auth endpoints
+  message: 'Terlalu banyak percobaan. Coba lagi dalam 1 menit.'
+});
 
-// ── Verifikasi Email via PIN ───────────────────────────────
-router.post('/verify-pin',        authCtrl.verifyPin);
+router.post('/register', rateLimitAuthBasic, authCtrl.register);
+router.post('/login', rateLimitAuthBasic, authCtrl.login);
+router.post('/verify-pin', rateLimitAuthBasic, authCtrl.verifyPin);
+router.post('/forgot-password', rateLimitAuthBasic, authCtrl.forgotPassword);
+router.post('/reset-password', rateLimitAuthBasic, authCtrl.resetPassword);
+
+// Yang sudah login
+router.put('/profile', authMiddleware, rateLimitAuth, authCtrl.updateProfile);
+router.put('/change-password', authMiddleware, rateLimitAuth, authCtrl.changePassword);
+
 router.post('/resend-pin',        authCtrl.resendPin);
-
-// ── Forgot & Reset Password ────────────────────────────────
-router.post('/forgot-password',   authCtrl.forgotPassword);
-router.post('/reset-password',    authCtrl.resetPassword);
-
-// ── Profile (butuh auth) ───────────────────────────────────
 router.get('/profile',            authMiddleware, authCtrl.getProfile);
-router.put('/profile',            authMiddleware, authCtrl.updateProfile);
-router.put('/change-password',    authMiddleware, authCtrl.changePassword);
 
 router.post('/upload-profile-picture', 
   authMiddleware, 

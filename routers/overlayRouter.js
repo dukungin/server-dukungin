@@ -1,4 +1,4 @@
-// routers/overlayRouter.js — tidak ada perubahan dari versi MySQL
+// routers/overlayRouter.js
 const express = require('express');
 const router = express.Router();
 const overlayCtrl = require('../controllers/overlayController');
@@ -8,15 +8,69 @@ const { audioUpload } = require('../middleware/multerConfig');
 const { proxyAudio } = require('../utils/proxyAudio');
 const upload = require('../middleware/audioUpload');
 
-router.get('/settings',         authMiddleware, overlayCtrl.getSettings);      // ← bukan getOverlaySettings
-router.put('/settings',         authMiddleware, overlayCtrl.updateSettings);   // ← ganti POST ke PUT
+
+// ========== TAMBAHKAN ini ==========
+const { rateLimitAuth, createRateLimit } = require('../middleware/rateLimit');
+
+// Rate limit untuk upload (PUBLIK - IP saja)
+const rateLimitUpload = createRateLimit({
+  windowMs: 60 * 1000,    // 1 menit
+  maxRequests: 5,        // max 5 upload per menit
+  message: 'Terlalu banyak upload. Coba lagi dalam 1 menit.',
+  useEmail: false        // Karena public (tidak perlu login)
+});
+
+// Rate limit untuk TTS (PUBLIK - IP saja)
+const rateLimitTTS = createRateLimit({
+  windowMs: 60 * 1000,    // 1 menit
+  maxRequests: 15,       // max 15 TTS request per menit
+  message: 'Terlalu banyak permintaan TTS. Coba lagi dalam 1 menit.',
+  useEmail: false
+});
+
+// Rate limit untuk settings (LOGIN - IP + Email)
+const rateLimitSettings = createRateLimit({
+  windowMs: 60 * 1000,    // 1 menit
+  maxRequests: 10,       // max 10 update per menit
+  message: 'Terlalu banyak perubahan settings. Coba lagi dalam 1 menit.',
+  useEmail: true
+});
+
+// Rate limit untuk proxy (PUBLIK - IP saja)
+const rateLimitProxy = createRateLimit({
+  windowMs: 60 * 1000,    // 1 menit
+  maxRequests: 10,       // max 10 proxy per menit
+  message: 'Terlalu banyak proxy request. Coba lagi dalam 1 menit.',
+  useEmail: false
+});
+
+
+// ========== ROUTES - LOGIN (ADMIN/STREAMER) ==========
+router.get('/settings', authMiddleware, overlayCtrl.getSettings);
+router.put('/settings', authMiddleware, rateLimitSettings, overlayCtrl.updateSettings);
+router.put('/store/:token', authMiddleware, rateLimitSettings, overlayCtrl.updateStoreProducts);
+router.post('/upload-profile-picture', authMiddleware, rateLimitUpload, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'Tidak ada file' });
+    const imageUrl = req.file.path;
+    res.json({ success: true, url: imageUrl });
+  } catch (err) {
+    res.status(500).json({ message: 'Upload gagal', error: err.message });
+  }
+});
+
+
+// ========== ROUTES - PUBLIK (SEMUA ORANG) ==========
 router.get('/public/:username', overlayCtrl.getPublicProfile);
-router.get('/store/:token', overlayCtrl.getStoreProducts);           // ← Public untuk OBS
-router.put('/store/:token', authMiddleware, overlayCtrl.updateStoreProducts); // ← Dashboard
-router.get('/config/:token',    overlayCtrl.getOverlaySettings);
-router.get('/tts/voices',  ttsCtrl.getVoiceList);   // tanpa auth — dipakai overlay OBS
-router.post('/tts/speak',  ttsCtrl.synthesize); 
-router.post('/upload-voice', upload.single('voice'), async (req, res) => {
+router.get('/store/:token', overlayCtrl.getStoreProducts);
+router.get('/config/:token', overlayCtrl.getOverlaySettings);
+router.get('/tts/voices', ttsCtrl.getVoiceList);
+
+// TTS - PUBLIK + rate limit
+router.post('/tts/speak', rateLimitTTS, ttsCtrl.synthesize); 
+
+// Upload - PUBLIK + rate limit
+router.post('/upload-voice', rateLimitUpload, upload.single('voice'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
     const url = req.file?.path || req.file?.location || req.file?.secure_url;
@@ -27,43 +81,26 @@ router.post('/upload-voice', upload.single('voice'), async (req, res) => {
   }
 });
 
-router.post('/upload-audio', upload.single('audio'), (req, res) => {
+router.post('/upload-audio', rateLimitUpload, upload.single('audio'), (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Tidak ada file audio!' });
-
-    // Cloudinary langsung kasih URL permanen di req.file.path
     const fileUrl = req.file.path;
-
     res.json({
       success: true,
-      url: fileUrl,  // https://res.cloudinary.com/...
+      url: fileUrl,
     });
   } catch (error) {
     res.status(500).json({ error: 'Upload gagal: ' + error.message });
   }
 });
 
-router.post('/upload-profile-picture', authMiddleware, upload.single('image'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ message: 'Tidak ada file' });
-
-    const imageUrl = req.file.path; // URL Cloudinary langsung
-
-    res.json({ success: true, url: imageUrl });
-  } catch (err) {
-    res.status(500).json({ message: 'Upload gagal', error: err.message });
-  }
-});
-
-// ✅ Proxy audio (bypass CORS)
-router.get('/proxy-audio', async (req, res) => {
+// Proxy - PUBLIK + rate limit
+router.get('/proxy-audio', rateLimitProxy, async (req, res) => {
   try {
     const { url } = req.query;
     if (!url) return res.status(400).json({ message: 'Missing URL' });
 
     console.log('🔄 Proxying:', url);
-
-    // ✅ FOLLOW REDIRECTS & EXTRACT AUDIO
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -76,13 +113,10 @@ router.get('/proxy-audio', async (req, res) => {
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const contentType = response.headers.get('content-type') || '';
     
-    // ✅ JIKA HTML (MyInstants page) → cari MP3 link
     if (contentType.includes('text/html')) {
       const html = await response.text();
       const mp3Match = html.match(/https:\/\/www\.myinstants\.com\/media\/sounds\/[^'"\s]+\.mp3/);
@@ -93,7 +127,6 @@ router.get('/proxy-audio', async (req, res) => {
       throw new Error('No MP3 found in HTML');
     }
 
-    // ✅ AUDIO DIRECT
     if (contentType.startsWith('audio/')) {
       const buffer = await response.arrayBuffer();
       return sendAudioBuffer(buffer, response.headers, res);

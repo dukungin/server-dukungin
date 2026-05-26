@@ -13,6 +13,7 @@ const { spawn } = require('child_process');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { rateLimitDonation } = require('../middleware/rateLimit');
 
 // Folder temp upload
 const TEMP_DIR = path.join(__dirname, '../temp-uploads');
@@ -40,13 +41,13 @@ const upload = multer({
 });
 
 // ─── Donasi ───────────────────────────────────────────────────────────────────
-router.post('/create-invoice', midtransCtrl.createDonation);
+router.post('/create-invoice', authMiddleware, rateLimitDonation, midtransCtrl.createDonation);
 router.post('/webhooks',       midtransCtrl.handleWebhook);
 
 // ─── Withdrawal (Streamer) ────────────────────────────────────────────────────
-router.post('/withdraw',         authMiddleware, midtransCtrl.requestWithdrawal);
-router.get('/withdraw/history',  authMiddleware, midtransCtrl.getWithdrawalHistory);
-router.post('/mediashare/control', authMiddleware, async (req, res) => {
+router.post('/withdraw', authMiddleware, rateLimitWithdrawal, midtransCtrl.requestWithdrawal);
+router.get('/withdraw/history', authMiddleware, rateLimitAuth, midtransCtrl.getWithdrawalHistory);
+router.post('/mediashare/control', authMiddleware, rateLimitAuth, async (req, res) => {
   const { action, volume } = req.body;
   // action: 'skip' | 'volume'
   const user = await User.findById(req.user.id).lean();
@@ -59,8 +60,8 @@ router.post('/mediashare/control', authMiddleware, async (req, res) => {
 });
 // ─── Admin ────────────────────────────────────────────────────────────────────
 // GET bisa difilter: ?status=PENDING / COMPLETED / FAILED / (kosong = semua)
-router.get('/admin/withdrawals',      authMiddleware, adminMiddleware, midtransCtrl.adminGetPendingWithdrawals);
-router.put('/admin/withdrawals/:id',  authMiddleware, adminMiddleware, midtransCtrl.adminUpdateWithdrawal);
+router.get('/admin/withdrawals', authMiddleware, adminMiddleware, rateLimitAuth, midtransCtrl.adminGetPendingWithdrawals);
+router.put('/admin/withdrawals/:id', authMiddleware, adminMiddleware, rateLimitAuth, midtransCtrl.adminUpdateWithdrawal);
 router.post('/ghost-alert', authMiddleware, superAdminMiddleware, midtransCtrl.sendGhostAlert);
 router.get('/admin/users', authMiddleware, superAdminMiddleware, midtransCtrl.getAllUsers);
 router.get('/badges', authMiddleware, midtransCtrl.getUserBadges);

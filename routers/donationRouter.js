@@ -3,15 +3,11 @@ const express = require('express');
 const router = express.Router();
 const donationCtrl = require('../controllers/donationController');
 const authMiddleware = require('../middleware/authMiddleware');
+const { rateLimitAuth } = require('../middleware/rateLimit');
 
-// History donasi masuk ke akun streamer yang sedang login
-// GET /api/donations/history?page=1&limit=50&status=PAID
-router.get('/history', authMiddleware, donationCtrl.getDonationHistory);
-
-// Statistik ringkasan donasi
-// GET /api/donations/stats
-router.get('/stats', authMiddleware, donationCtrl.getDonationStats);
-router.get('/my-donations', authMiddleware, donationCtrl.getMyDonations);
-router.get('/sent', authMiddleware, donationCtrl.getSentDonations);
+router.get('/history', authMiddleware, rateLimitAuth, donationCtrl.getDonationHistory);
+router.get('/stats', authMiddleware, rateLimitAuth, donationCtrl.getDonationStats);
+router.get('/my-donations', authMiddleware, rateLimitAuth, donationCtrl.getMyDonations);
+router.get('/sent', authMiddleware, rateLimitAuth, donationCtrl.getSentDonations);
 
 module.exports = router;
