@@ -41,7 +41,7 @@ const upload = multer({
 });
 
 // ─── Donasi ───────────────────────────────────────────────────────────────────
-router.post('/create-invoice', authMiddleware, midtransCtrl.createDonation);
+router.post('/create-invoice', midtransCtrl.createDonation);
 router.post('/webhooks',       midtransCtrl.handleWebhook);
 
 // ─── Withdrawal (Streamer) ────────────────────────────────────────────────────
