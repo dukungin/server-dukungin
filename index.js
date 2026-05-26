@@ -9,7 +9,6 @@ const { donationQueue, QueueItem } = require('./utils/donationQueue');
 const { initTelegram, sendNotification } = require('./config/telegram');
 const telegramQueue = { sendWithdrawalNotification, sendDonationNotification } = require('./utils/telegramNotification');
 const updateAvailableBalance = require('./cron/updateAvailableBalance');
-const path = require('path');
 
 // Jalankan setiap 1 menit
 setInterval(updateAvailableBalance, 60 * 1000); 
