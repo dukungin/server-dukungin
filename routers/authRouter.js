@@ -5,7 +5,7 @@ const authCtrl = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
 const uploadImage = require('../middleware/imageUpload');
 const { User } = require('../models');
-const { rateLimitAuth } = require('../middleware/rateLimit');
+const { rateLimitAuth, createRateLimit } = require('../middleware/rateLimit');
 
 // Rate limit untuk login/register (bukan authenticated, jadi hanya IP)
 const rateLimitAuthBasic = createRateLimit({
