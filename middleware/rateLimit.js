@@ -107,9 +107,17 @@ const rateLimitDonation = createRateLimit({
   useEmail: false
 });
 
+const rateLimitWithdrawal = createRateLimit({
+  windowMs: 60 * 1000,      // 1 menit
+  maxRequests: 5,           // Hanya 5x request withdraw per menit
+  message: 'Terlalu banyak permintaan penarikan. Coba lagi dalam 1 menit.',
+  useEmail: true            // Pakai IP + Email karena butuh login
+});
+
 module.exports = {
   createRateLimit,
   rateLimitAuth,
+  rateLimitWithdrawal,
   rateLimitPublic,
   rateLimitDonation,
   rateLimitUpload
