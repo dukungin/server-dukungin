@@ -60,7 +60,7 @@ const userSchema = new mongoose.Schema(
     },
     securityPin: { 
       type: String, 
-      required: false,        // ← penting: false dulu
+      required: true,        // ← penting: false dulu
       minlength: 4,
       maxlength: 4
     },
