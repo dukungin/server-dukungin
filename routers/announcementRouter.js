@@ -38,8 +38,7 @@ const upload = multer({
 
 // ─── Helper: build public URL ────────────────────────────────────────────────
 
-const getImageUrl = (filename) =>
-  filename ? `/uploads/announcements/${filename}` : null;
+const getImageUrl = (result) => result?.secure_url || null;
 
 // ─── SUPER ADMIN ROUTES ──────────────────────────────────────────────────────
 
@@ -84,14 +83,15 @@ router.get('/admin', authMiddleware, superAdminMiddleware, async (req, res) => {
   }
 });
 
-router.post('/admin', authMiddleware, superAdminMiddleware, upload.single('image'), async (req, res) => {
+router.post('/admin', authMiddleware, superAdminMiddleware, uploadAnnouncement.single('image'), async (req, res) => {
   try {
     const { title, description, type, expiresAt, isActive } = req.body;
+
     if (!title || !description) {
       return res.status(400).json({ message: 'Judul dan deskripsi wajib diisi' });
     }
 
-    const imageUrl = req.file ? getImageUrl(req.file.filename) : null;
+    const imageUrl = req.file ? getImageUrl(req.file) : null;   // ← Cloudinary
 
     const announcement = await Announcement.create({
       title: title.trim(),
@@ -109,21 +109,23 @@ router.post('/admin', authMiddleware, superAdminMiddleware, upload.single('image
   }
 });
 
-router.put('/admin/:id', authMiddleware, superAdminMiddleware, upload.single('image'), async (req, res) => {
+// Update route PUT juga
+router.put('/admin/:id', authMiddleware, superAdminMiddleware, uploadAnnouncement.single('image'), async (req, res) => {
   try {
     const { title, description, type, expiresAt, isActive, removeImage } = req.body;
     const announcement = await Announcement.findById(req.params.id);
+
     if (!announcement) return res.status(404).json({ message: 'Pengumuman tidak ditemukan' });
 
-    // Hapus gambar lama jika ada yang baru atau diminta hapus
+    // Hapus gambar lama di Cloudinary jika ada yang baru atau diminta hapus
     if ((req.file || removeImage === 'true') && announcement.imageUrl) {
-      const oldPath = path.join(__dirname, '../public', announcement.imageUrl);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      const publicId = announcement.imageUrl.split('/').pop().split('.')[0]; // ambil public_id
+      await cloudinary.uploader.destroy(`announcements/${publicId}`);
       announcement.imageUrl = null;
     }
 
     if (req.file) {
-      announcement.imageUrl = getImageUrl(req.file.filename);
+      announcement.imageUrl = getImageUrl(req.file);
     }
 
     if (title) announcement.title = title.trim();
