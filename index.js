@@ -109,7 +109,7 @@ const voiceRoutes      = require('./routers/voiceRouter');
 const waRoutes = require('./routers/waRouter');
 const suggestionRoutes = require('./routers/suggestionRouter');
 const youtubeCheckRoutes = require('./routers/youtubeCheck');
-const Announcement = require('./routers/announcementRouter');
+const announcementRoutes = require('./routers/announcementRouter');
 
 app.get('/testing', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running!', node_env: process.env.NODE_ENV });
