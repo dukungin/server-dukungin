@@ -43,7 +43,12 @@ exports.transferBalance = async (req, res) => {
 
   try {
     const senderId      = req.user.id;
-    const { recipientId, amount, note } = req.body;
+    const { recipientId, amount, note, securityPin } = req.body;
+
+    if (!securityPin || !/^\d{4}$/.test(securityPin)) {
+        await session.abortTransaction();
+        return res.status(400).json({ message: 'PIN harus 4 digit angka' });
+    }
 
     // ── Validasi input ────────────────────────────────────────────────────────
     if (!recipientId || !amount) {
@@ -83,6 +88,12 @@ exports.transferBalance = async (req, res) => {
     if (!sender) {
       await session.abortTransaction();
       return res.status(404).json({ message: 'Akun tidak ditemukan' });
+    }
+
+    const isPinValid = sender.validSecurityPin(securityPin);
+        if (!isPinValid) {
+        await session.abortTransaction();
+        return res.status(401).json({ message: 'PIN keamanan salah' });
     }
 
     if ((sender.availableBalance ?? 0) < numAmount) {
