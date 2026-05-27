@@ -394,3 +394,30 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+exports.changePin = async (req, res) => {
+  try {
+    const { currentPin, newPin } = req.body;
+
+    if (!currentPin || !newPin || !/^\d{4}$/.test(currentPin) || !/^\d{4}$/.test(newPin)) {
+      return res.status(400).json({ message: 'PIN harus 4 digit angka' });
+    }
+    if (currentPin === newPin) {
+      return res.status(400).json({ message: 'PIN baru tidak boleh sama dengan PIN lama' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
+
+    const isValid = await bcrypt.compare(currentPin, user.securityPin);
+    if (!isValid) return res.status(401).json({ message: 'PIN saat ini salah' });
+
+    user.securityPin = newPin; // pre-save hook akan hash otomatis
+    await user.save();
+
+    res.json({ message: 'PIN berhasil diubah' });
+  } catch (err) {
+    console.error('changePin error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
