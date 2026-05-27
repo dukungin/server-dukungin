@@ -410,7 +410,7 @@ exports.changePin = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
 
     const isValid = await bcrypt.compare(currentPin, user.securityPin);
-    if (!isValid) return res.status(401).json({ message: 'PIN saat ini salah' });
+    if (!isValid) return res.status(400).json({ message: 'PIN saat ini salah' });
 
     user.securityPin = newPin; // pre-save hook akan hash otomatis
     await user.save();
