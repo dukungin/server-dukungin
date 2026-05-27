@@ -8,6 +8,7 @@ const BannedWord = require('./bannedWord');
 const Subathon = require('./subathon');
 const Poll = require('./poll');
 const Suggestion = require('./suggestion');
+const Announcement = require('./announcement');
 
 module.exports = {
   User,
@@ -19,5 +20,6 @@ module.exports = {
   BannedWord,
   Subathon,
   Poll,
-  Suggestion
+  Suggestion,
+  Announcement
 };
