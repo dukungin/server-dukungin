@@ -1,53 +1,32 @@
 // routers/announcementRouter.js
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const cloudinary = require('cloudinary').v2;                    // ← TAMBAHKAN INI
+const cloudinary = require('cloudinary').v2;
+
 const authMiddleware = require('../middleware/authMiddleware');
 const superAdminMiddleware = require('../middleware/superAdminMiddleware');
 const Announcement = require('../models/announcement');
 const uploadAnnouncement = require('../middleware/cloudinaryUpload');
 
-// ─── Multer setup for image upload ──────────────────────────────────────────
+// Helper
+const getImageUrl = (file) => {
+  if (!file) return null;
+  return file.secure_url || file.path || null;   // Cloudinary biasanya pakai secure_url
+};
 
-const uploadDir = path.join(__dirname, '../public/uploads/announcements');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `ann_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  fileFilter: (req, file, cb) => {
-    const allowed = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (!allowed.includes(ext)) {
-      return cb(new Error('Hanya file gambar yang diizinkan'));
-    }
-    cb(null, true);
-  },
-});
-
-// ─── Helper: build public URL ────────────────────────────────────────────────
-
-const getImageUrl = (result) => result?.secure_url || null;
+const getPublicId = (imageUrl) => {
+  if (!imageUrl) return null;
+  try {
+    const parts = imageUrl.split('/');
+    const filenameWithExt = parts[parts.length - 1];
+    const publicId = filenameWithExt.split('.')[0];
+    return `announcements/${publicId}`;
+  } catch (e) {
+    return null;
+  }
+};
 
 // ─── SUPER ADMIN ROUTES ──────────────────────────────────────────────────────
-
-// GET  /api/announcements/admin         — semua pengumuman (termasuk expired/inactive)
-// POST /api/announcements/admin         — buat pengumuman baru
-// PUT  /api/announcements/admin/:id     — edit pengumuman
-// DELETE /api/announcements/admin/:id   — hapus pengumuman
 
 router.get('/admin', authMiddleware, superAdminMiddleware, async (req, res) => {
   try {
@@ -66,7 +45,6 @@ router.get('/admin', authMiddleware, superAdminMiddleware, async (req, res) => {
       Announcement.countDocuments(filter),
     ]);
 
-    // Tambahkan readCount ke setiap announcement
     const enriched = announcements.map(a => ({
       ...a,
       readCount: a.readBy?.length || 0,
@@ -89,11 +67,11 @@ router.post('/admin', authMiddleware, superAdminMiddleware, uploadAnnouncement.s
   try {
     const { title, description, type, expiresAt, isActive } = req.body;
 
-    if (!title || !description) {
+    if (!title?.trim() || !description?.trim()) {
       return res.status(400).json({ message: 'Judul dan deskripsi wajib diisi' });
     }
 
-    const imageUrl = req.file ? getImageUrl(req.file) : null;   // ← Cloudinary
+    const imageUrl = req.file ? getImageUrl(req.file) : null;
 
     const announcement = await Announcement.create({
       title: title.trim(),
@@ -107,11 +85,11 @@ router.post('/admin', authMiddleware, superAdminMiddleware, uploadAnnouncement.s
 
     res.status(201).json(announcement);
   } catch (err) {
+    console.error('Create Announcement Error:', err);
     res.status(500).json({ message: err.message });
   }
 });
 
-// Update route PUT juga
 router.put('/admin/:id', authMiddleware, superAdminMiddleware, uploadAnnouncement.single('image'), async (req, res) => {
   try {
     const { title, description, type, expiresAt, isActive, removeImage } = req.body;
@@ -119,13 +97,14 @@ router.put('/admin/:id', authMiddleware, superAdminMiddleware, uploadAnnouncemen
 
     if (!announcement) return res.status(404).json({ message: 'Pengumuman tidak ditemukan' });
 
-    // Hapus gambar lama di Cloudinary jika ada yang baru atau diminta hapus
+    // Hapus gambar lama di Cloudinary
     if ((req.file || removeImage === 'true') && announcement.imageUrl) {
-      const publicId = announcement.imageUrl.split('/').pop().split('.')[0]; // ambil public_id
-      await cloudinary.uploader.destroy(`announcements/${publicId}`);
+      const publicId = getPublicId(announcement.imageUrl);
+      if (publicId) await cloudinary.uploader.destroy(publicId);
       announcement.imageUrl = null;
     }
 
+    // Upload gambar baru
     if (req.file) {
       announcement.imageUrl = getImageUrl(req.file);
     }
@@ -139,6 +118,7 @@ router.put('/admin/:id', authMiddleware, superAdminMiddleware, uploadAnnouncemen
     await announcement.save();
     res.json(announcement);
   } catch (err) {
+    console.error('Update Announcement Error:', err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -148,10 +128,9 @@ router.delete('/admin/:id', authMiddleware, superAdminMiddleware, async (req, re
     const announcement = await Announcement.findById(req.params.id);
     if (!announcement) return res.status(404).json({ message: 'Tidak ditemukan' });
 
-    // Hapus file gambar jika ada
     if (announcement.imageUrl) {
-      const filePath = path.join(__dirname, '../public', announcement.imageUrl);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      const publicId = getPublicId(announcement.imageUrl);
+      if (publicId) await cloudinary.uploader.destroy(publicId);
     }
 
     await announcement.deleteOne();
