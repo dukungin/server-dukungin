@@ -4,6 +4,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const cloudinary = require('cloudinary').v2;                    // ← TAMBAHKAN INI
 const authMiddleware = require('../middleware/authMiddleware');
 const superAdminMiddleware = require('../middleware/superAdminMiddleware');
 const Announcement = require('../models/announcement');
