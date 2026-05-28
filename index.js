@@ -110,6 +110,7 @@ const suggestionRoutes = require('./routers/suggestionRouter');
 const youtubeCheckRoutes = require('./routers/youtubeCheck');
 const announcementRoutes = require('./routers/announcementRouter');
 const transferRoutes = require('./routers/transferRouter');
+const maintenanceRoutes = require('./routers/maintenanceRouter');
 
 app.get('/testing', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running!', node_env: process.env.NODE_ENV });
@@ -131,6 +132,7 @@ app.use('/api/milestones',   milestoneRoutes);
 app.use('/api/banned-words', bannedWordRoutes);
 app.use('/api/donations',    donationRoutes);
 app.use('/widget',           widgetRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/subathon',     subathonRoutes);
 app.use('/api/polls',        pollRoutes);

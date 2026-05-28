@@ -9,6 +9,7 @@ const Subathon = require('./subathon');
 const Poll = require('./poll');
 const Suggestion = require('./suggestion');
 const Announcement = require('./announcement');
+const Maintenance = require('./maintenance');
 
 module.exports = {
   User,
@@ -21,5 +22,6 @@ module.exports = {
   Subathon,
   Poll,
   Suggestion,
-  Announcement
+  Announcement,
+  Maintenance
 };
