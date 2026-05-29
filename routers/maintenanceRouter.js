@@ -19,6 +19,22 @@ router.get('/settings', auth, async (req, res) => {
   }
 });
 
+// Tambah di routes/maintenance.js — SEBELUM route yang ada
+router.get('/public', async (req, res) => {
+  try {
+    let settings = await Maintenance.findOne();
+    if (!settings) return res.json({ auth: false, supporter: false, withdrawal: false, dashboard: false });
+    res.json({
+      auth: settings.auth,
+      supporter: settings.supporter,
+      withdrawal: settings.withdrawal,
+      dashboard: settings.dashboard,
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // UPDATE settings - Hanya Super Admin yang boleh
 router.put('/settings', auth, async (req, res) => {
   try {
