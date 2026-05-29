@@ -15,7 +15,8 @@ maintenanceSchema.pre('save', async function(next) {
   if (this.isNew) {
     const count = await Maintenance.countDocuments();
     if (count >= 1) {
-      throw new Error('Hanya boleh ada satu pengaturan maintenance');
+      // ✅ Pakai next(err), bukan throw
+      return next(new Error('Hanya boleh ada satu pengaturan maintenance'));
     }
   }
   next();

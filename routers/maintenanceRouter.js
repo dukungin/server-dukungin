@@ -22,35 +22,31 @@ router.get('/settings', auth, async (req, res) => {
 // UPDATE settings - Hanya Super Admin yang boleh
 router.put('/settings', auth, async (req, res) => {
   try {
-    // Cek apakah user adalah Super Admin
     if (req.user.role !== 'superAdmin') {
-      return res.status(403).json({ 
-        message: 'Akses ditolak. Hanya Super Admin yang dapat mengubah pengaturan maintenance.' 
-      });
+      return res.status(403).json({ message: 'Akses ditolak.' });
     }
 
     const { auth, supporter, withdrawal, dashboard } = req.body;
 
-    let settings = await Maintenance.findOne();
-    if (!settings) {
-      settings = new Maintenance();
-    }
+    // ✅ upsert=true → buat jika belum ada, update jika sudah ada
+    // findOneAndUpdate TIDAK trigger pre('save') hook
+    const settings = await Maintenance.findOneAndUpdate(
+      {},
+      {
+        $set: {
+          auth: auth ?? false,
+          supporter: supporter ?? false,
+          withdrawal: withdrawal ?? false,
+          dashboard: dashboard ?? false,
+          updatedBy: req.user.id,
+        }
+      },
+      { upsert: true, new: true }
+    );
 
-    settings.auth = auth ?? settings.auth;
-    settings.supporter = supporter ?? settings.supporter;
-    settings.withdrawal = withdrawal ?? settings.withdrawal;
-    settings.dashboard = dashboard ?? settings.dashboard;
-    settings.updatedBy = req.user.id;
-
-    await settings.save();
-
-    res.json({ 
-      success: true, 
-      message: 'Pengaturan Maintenance berhasil disimpan',
-      data: settings 
-    });
+    res.json({ success: true, message: 'Pengaturan berhasil disimpan', data: settings });
   } catch (err) {
-    console.error('[Maintenance PUT Error]', err);
+    console.error('[Maintenance PUT Error]', err.message); // ← Akan kelihatan errornya
     res.status(500).json({ message: err.message });
   }
 });
