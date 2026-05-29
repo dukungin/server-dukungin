@@ -125,6 +125,9 @@ const overlaySettingSchema = new mongoose.Schema(
     ttsVolume: { type: Number, default: 1.0 },
     ttsVoiceName:    { type: String,  default: 'id-ID-GadisNeural' },
     ttsLanguageCode: { type: String,  default: 'id-ID' },
+    voiceBaseDuration:   { type: Number, default: 10   },   // detik dasar
+    voiceExtraPerAmount: { type: Number, default: 10000 },   // per Rp10.000
+    voiceExtraDuration:  { type: Number, default: 5     },   // +5 detik
 
     storeProducts: [{
       name: String,
@@ -153,6 +156,15 @@ overlaySettingSchema.methods.getDuration = function (amount) {
   }
   const extras = Math.floor(amount / this.extraPerAmount);
   return this.baseDuration + extras * this.extraDuration;
+};
+
+overlaySettingSchema.methods.getVoiceDuration = function (amount) {
+  if (!amount || amount <= 0) return 10000;
+  const base     = Number(this.voiceBaseDuration)     || 10;
+  const perAmt   = Number(this.voiceExtraPerAmount)   || 10000;
+  const extraDur = Number(this.voiceExtraDuration)    || 5;
+  const extras   = perAmt > 0 ? Math.floor(amount / perAmt) : 0;
+  return (base + extras * extraDur) * 1000; // ms
 };
 
 overlaySettingSchema.methods.getAlertDuration = function (amount) {
