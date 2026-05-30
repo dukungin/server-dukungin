@@ -365,13 +365,37 @@ router.post('/temp-upload', upload.single('image'), (req, res) => {
   res.json({ url: fileUrl, expiresIn: '15 minutes' });
 });
 
-// GET /api/midtrans/admin/donation-logs?streamer=all&limit=100
+// GET /api/midtrans/admin/donation-logs
 router.get('/admin/donation-logs', authMiddleware, superAdminMiddleware, async (req, res) => {
-  const { streamer = 'all', limit = 100, status = '' } = req.query;
+  const { 
+    streamer = 'all', 
+    limit = 100, 
+    status = '', 
+    startDate, 
+    endDate 
+  } = req.query;
 
   try {
     const filter = {};
+
     if (status) filter.status = status;
+
+    // === DATE RANGE FILTER (Improved) ===
+    if (startDate || endDate) {
+      filter.createdAt = {};
+
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);           // Mulai dari jam 00:00:00
+        filter.createdAt.$gte = start;
+      }
+
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);        // Sampai jam 23:59:59.999
+        filter.createdAt.$lte = end;          // Gunakan $lte bukan $lt
+      }
+    }
 
     if (streamer !== 'all') {
       const user = await User.findOne({ username: streamer }).lean();
@@ -383,10 +407,14 @@ router.get('/admin/donation-logs', authMiddleware, superAdminMiddleware, async (
       .populate('userId', 'username email overlayToken')
       .populate('donorUserId', 'username')
       .sort({ createdAt: -1 })
-      .limit(Number(limit))
+      .limit(Number(limit) || 100)
       .lean();
 
-    res.json({ donations, total: donations.length });
+    res.json({ 
+      donations, 
+      total: donations.length,
+      filter: { startDate, endDate } // untuk debugging
+    });
   } catch (err) {
     console.error('[AdminDonationLogs] Error:', err);
     res.status(500).json({ error: err.message });
