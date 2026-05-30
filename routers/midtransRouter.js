@@ -365,4 +365,45 @@ router.post('/temp-upload', upload.single('image'), (req, res) => {
   res.json({ url: fileUrl, expiresIn: '15 minutes' });
 });
 
+// GET /api/midtrans/admin/donation-logs?streamer=all&limit=100
+router.get('/admin/donation-logs', authMiddleware, superAdminMiddleware, async (req, res) => {
+  const { streamer = 'all', limit = 100, status = '' } = req.query;
+
+  try {
+    const filter = {};
+    if (status) filter.status = status;
+
+    if (streamer !== 'all') {
+      const user = await User.findOne({ username: streamer }).lean();
+      if (!user) return res.status(404).json({ message: 'Streamer tidak ditemukan' });
+      filter.userId = user._id;
+    }
+
+    const donations = await Donation.find(filter)
+      .populate('userId', 'username email overlayToken')
+      .populate('donorUserId', 'username')
+      .sort({ createdAt: -1 })
+      .limit(Number(limit))
+      .lean();
+
+    res.json({ donations, total: donations.length });
+  } catch (err) {
+    console.error('[AdminDonationLogs] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/midtrans/admin/streamers-list — untuk dropdown
+router.get('/admin/streamers-list', authMiddleware, superAdminMiddleware, async (req, res) => {
+  try {
+    const users = await User.find({ role: { $ne: 'superAdmin' } })
+      .select('username email totalDonations totalDonationCount walletBalance')
+      .sort({ totalDonations: -1 })
+      .lean();
+    res.json({ users });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
