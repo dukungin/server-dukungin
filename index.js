@@ -112,6 +112,7 @@ const streamerRoutes = require('./routers/streamerRouter');
 const announcementRoutes = require('./routers/announcementRouter');
 const transferRoutes = require('./routers/transferRouter');
 const maintenanceRoutes = require('./routers/maintenanceRouter');
+const streamerManageRoutes = require('./routers/streamerManagerRouter');
 
 app.get('/testing', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running!', node_env: process.env.NODE_ENV });
@@ -129,6 +130,7 @@ app.use('/api/superadmin',   superAdminRoutes);
 app.use('/api/voice',        voiceRoutes);
 app.use('/api/transfer',        transferRoutes);
 app.use('/api/follows',      followRoutes);
+app.use('/api/streamer-manage',      streamerManageRoutes);
 app.use('/api/milestones',   milestoneRoutes);
 app.use('/api/banned-words', bannedWordRoutes);
 app.use('/api/donations',    donationRoutes);
