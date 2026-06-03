@@ -12,8 +12,9 @@ const getChannelIdFromUrl = (url) => {
 
 exports.getPublicStreamers = async (req, res) => {
   try {
-    const users = await User.find({
-      youtube: { $ne: null, $ne: '' }
+     const users = await User.find({
+      youtube:  { $ne: null, $ne: '' },
+      isActive: { $ne: false },
     }).select('username youtube profilePicture bio donateIntro');
 
     const result = [];

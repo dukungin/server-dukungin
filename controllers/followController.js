@@ -108,11 +108,13 @@ exports.discoverStreamers = async (req, res) => {
     const myId = req.user.id;
     const { page = 1, limit = 20, search = '' } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
-
-    const searchQuery = search
-      ? { username: { $regex: search, $options: 'i' }, _id: { $ne: myId } }
-      : { _id: { $ne: myId } };
-
+ 
+    const searchQuery = {
+      _id:      { $ne: myId },
+      isActive: { $ne: false }, // ← filter user nonaktif
+      ...(search ? { username: { $regex: search, $options: 'i' } } : {}),
+    };
+ 
     const [users, total] = await Promise.all([
       User.find(searchQuery)
         .select('username email profilePicture createdAt')
@@ -122,28 +124,24 @@ exports.discoverStreamers = async (req, res) => {
         .lean(),
       User.countDocuments(searchQuery),
     ]);
-
-    // Ambil semua following saya sekaligus untuk cek status
-    const myFollowing = await Follow.find({ follower: myId })
-      .select('following')
-      .lean();
-    const followingSet = new Set(myFollowing.map(f => f.following.toString()));
-
-    // Hitung follower count per user
-    const userIds = users.map(u => u._id);
+ 
+    const myFollowing = await Follow.find({ follower: myId }).select('following').lean();
+    const followingSet = new Set(myFollowing.map((f) => f.following.toString()));
+ 
+    const userIds = users.map((u) => u._id);
     const followerCounts = await Follow.aggregate([
       { $match: { following: { $in: userIds } } },
       { $group: { _id: '$following', count: { $sum: 1 } } },
     ]);
     const countMap = {};
-    followerCounts.forEach(f => { countMap[f._id.toString()] = f.count; });
-
-    const result = users.map(u => ({
+    followerCounts.forEach((f) => { countMap[f._id.toString()] = f.count; });
+ 
+    const result = users.map((u) => ({
       ...u,
-      isFollowing: followingSet.has(u._id.toString()),
+      isFollowing:    followingSet.has(u._id.toString()),
       followersCount: countMap[u._id.toString()] || 0,
     }));
-
+ 
     res.json({
       users: result,
       pagination: { total, page: Number(page), totalPages: Math.ceil(total / Number(limit)) },
